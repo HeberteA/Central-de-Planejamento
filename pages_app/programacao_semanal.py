@@ -177,7 +177,7 @@ def app(obra_id):
                 "obra_id": obra_id,
                 "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
                 "local": str(local).upper(),
-                "atividade": str(atividade_input).upper(),
+                "atividade": str(atividade_val).upper(),
                 "detalhe": str(detalhe).upper(),
                 "encarregado": str(equipe).upper(),
                 "rec_seg": rec_seg, "rec_ter": rec_ter, "rec_qua": rec_qua,
