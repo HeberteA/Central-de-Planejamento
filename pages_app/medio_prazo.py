@@ -160,7 +160,6 @@ def app(obra_id):
                         atv_sel = st.selectbox("Selecionar Atividade", atividades_padrao) if atividades_padrao else st.text_input("Atividade")
                 semana_sel = c2.selectbox("Semana", lista_semanas)
                 local_sel = c3.selectbox("Local", list(locais.keys())) if locais else c2.text_input("Local")
-                atv_sel = c3.selectbox("Atividade", atividades) if atividades else c3.text_input("Atividade")
                 
                 c4, c5 = st.columns(2)
                 resp_input = c4.text_input("Responsavel")
