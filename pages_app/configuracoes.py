@@ -109,10 +109,7 @@ def render_atividades_padrao(supabase):
                     st.rerun()
                 except Exception as e:
                     err_msg = str(e)
-                    if "duplicate key" in err_msg:
-                        st.warning(f"Atenção: A atividade '{nova_atv.upper()}' já existe.")
-                    else:
-                        st.error(f"Erro técnico ao salvar: {err_msg}")
+                    st.error(f"Erro retornado pelo banco: {err_msg}")
 
     try:
         resp = supabase.table("pcp_atividades_padrao").select("*").order("atividade").execute()
