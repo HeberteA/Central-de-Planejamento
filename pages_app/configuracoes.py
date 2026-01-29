@@ -100,15 +100,19 @@ def render_atividades_padrao(supabase):
     with st.expander("Nova Atividade", expanded=False):
         c_add = st.container()
         nova_atv = c_add.text_input("Nome da Atividade")
-        if c_add.button("CADASTRAR ATIVIDADE"):
+        if c_add.button("Cadastrar Atividades", use_container_width=True):
             if nova_atv:
                 try:
-                    supabase.table("pcp_atividades_padrao").insert({"atividade": nova_atv.upper()}).execute()
+                    supabase.table("pcp_atividades_padrao").insert({"atividade": nova_atv.upper().strip()}).execute()
                     st.success("Cadastrada!")
                     time.sleep(0.5)
                     st.rerun()
                 except Exception as e:
-                    st.warning(f"Erro: Essa atividade provavelmente já está cadastrada.")
+                    err_msg = str(e)
+                    if "duplicate key" in err_msg:
+                        st.warning(f"Atenção: A atividade '{nova_atv.upper()}' já existe.")
+                    else:
+                        st.error(f"Erro técnico ao salvar: {err_msg}")
 
     try:
         resp = supabase.table("pcp_atividades_padrao").select("*").order("atividade").execute()
