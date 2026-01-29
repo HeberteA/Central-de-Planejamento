@@ -156,7 +156,7 @@ def app(obra_id):
             c_a, c_b, c_c = st.columns(3)
             local = c_b.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
             with c_a:
-                usar_texto = st.toggle("Digitar nova atividade?", key="toggle_sem")
+                usar_texto = st.toggle("Digitar nova atividade?", key="toggle_prog")
                 if usar_texto:
                     atividade_input = st.text_input("Nome da Atividade", placeholder="Digite aqui...")
                 else:
