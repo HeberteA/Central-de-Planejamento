@@ -155,42 +155,37 @@ def app(obra_id):
         c_a, c_b, c_c = st.columns(3)
 
         with c_a:
-            texto = st.toggle("Digitar nova atividade?", key="toggle_prog")
-            if texto:
-                atividade_input = st.text_input("Nome da Atividade", placeholder="Digite aqui...")
+            usar_texto = st.toggle("Digitar Manualmente?", key="tgg_atv_manual")
+            if usar_texto:
+                atividade_val = st.text_input("Nome da Atividade", placeholder="Digite a atividade...")
             else:
-                atividades_padrao = []
-                try:
-                    r = supabase.table("pcp_atividades_padrao").select("atividade").execute()
-                    atividades_padrao = [a['atividade'] for a in r.data]
-                except: pass
-                atividade_input = st.selectbox("Selecionar Atividade", atividades_padrao) if atividades_padrao else st.text_input("Atividade")
-            local = c_b.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
-            equipe = c_c.text_input("Equipe")
-            detalhe = st.text_input("Detalhe / Recurso")
+                atividade_val = st.selectbox("Atividade Padrão", lista_atividades) if lista_atividades else st.text_input("Atividade")
+        local = c_b.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
+        equipe = c_c.text_input("Equipe")
+        detalhe = st.text_input("Detalhe / Recurso")
+        
+        st.markdown("**Planejamento Inicial**")
+        r1, r2, r3, r4, r5 = st.columns(5)
+        rec_seg = r1.text_input("Seg", key="n_seg")
+        rec_ter = r2.text_input("Ter", key="n_ter")
+        rec_qua = r3.text_input("Qua", key="n_qua")
+        rec_qui = r4.text_input("Qui", key="n_qui")
+        rec_sex = r5.text_input("Sex", key="n_sex")
 
-            st.markdown("**Planejamento Inicial**")
-            r1, r2, r3, r4, r5 = st.columns(5)
-            rec_seg = r1.text_input("Seg", key="n_seg")
-            rec_ter = r2.text_input("Ter", key="n_ter")
-            rec_qua = r3.text_input("Qua", key="n_qua")
-            rec_qui = r4.text_input("Qui", key="n_qui")
-            rec_sex = r5.text_input("Sex", key="n_sex")
-
-            if st.form_submit_button("Lançar Atividade", use_container_width=True):
-                dados = {
-                    "obra_id": obra_id,
-                    "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
-                    "local": str(local).upper(),
-                    "atividade": str(atividade_input).upper(),
-                    "detalhe": str(detalhe).upper(),
-                    "encarregado": str(equipe).upper(),
-                    "rec_seg": rec_seg, "rec_ter": rec_ter, "rec_qua": rec_qua,
-                    "rec_qui": rec_qui, "rec_sex": rec_sex,
-                    "status": "A Iniciar"
-                }
-                supabase.table("pcp_programacao_semanal").insert(dados).execute()
-                st.rerun()
+        if st.form_submit_button("Lançar Atividade", use_container_width=True):
+            dados = {
+                "obra_id": obra_id,
+                "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
+                "local": str(local).upper(),
+                "atividade": str(atividade_input).upper(),
+                "detalhe": str(detalhe).upper(),
+                "encarregado": str(equipe).upper(),
+                "rec_seg": rec_seg, "rec_ter": rec_ter, "rec_qua": rec_qua,
+                "rec_qui": rec_qui, "rec_sex": rec_sex,
+                "status": "A Iniciar"
+            }
+            supabase.table("pcp_programacao_semanal").insert(dados).execute()
+            st.rerun()
     st.markdown("---")
 
     response = supabase.table("pcp_programacao_semanal").select("*")\
