@@ -157,16 +157,16 @@ def app(obra_id):
             
             usar_texto = c_form.toggle("Digitar nova atividade?", key="new_pp_tgg")
                 
-                atividades_padrao = []
-                try:
-                    r = supabase.table("pcp_atividades_padrao").select("atividade").execute()
-                    atividades_padrao = [a['atividade'] for a in r.data]
-                except: pass
+            atividades_padrao = []
+            try:
+                r = supabase.table("pcp_atividades_padrao").select("atividade").execute()
+                atividades_padrao = [a['atividade'] for a in r.data]
+            except: pass
                 
-                if usar_texto:
-                    atividade_input = c_form.text_input("Nome da Atividade")
-                else:
-                    atividade_input = c_form.selectbox("Selecionar Atividade", [a.upper() for a in atividades_padrao]) if atividades_padrao else c_form.text_input("Atividade")
+            if usar_texto:
+                atividade_input = c_form.text_input("Nome da Atividade")
+            else:
+                atividade_input = c_form.selectbox("Selecionar Atividade", [a.upper() for a in atividades_padrao]) if atividades_padrao else c_form.text_input("Atividade")
             local = c_a.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
             equipe = c_b.text_input("Equipe")
             detalhe = st.text_input("Detalhe / Recurso")
