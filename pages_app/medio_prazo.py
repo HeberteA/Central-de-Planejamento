@@ -145,7 +145,7 @@ def app(obra_id):
                 lista_semanas.append(label)
 
             with st.form("form_novo_pacote", clear_on_submit=True):
-                c1, c2, c3 = st.columns(3)
+                c1, c2, = st.columns(2)
                 with c1:
                     c_form = st.container()   
                     usar_texto = st.toggle("Digitar nova atividade?", key="toggle_sem")
@@ -159,12 +159,11 @@ def app(obra_id):
                         except: pass
                         atv_sel = st.selectbox("Selecionar Atividade", atividades_padrao) if atividades_padrao else st.text_input("Atividade")
                 semana_sel = c2.selectbox("Semana", lista_semanas)
-                local_sel = c3.selectbox("Local", list(locais.keys())) if locais else c2.text_input("Local")
+                
                 
                 c4, c5 = st.columns(2)
                 resp_input = c4.text_input("Responsavel")
-                status_input = c5.selectbox("Status Inicial", ["Em Analise", "Liberado", "Bloqueado"])
-                
+                local_sel = c5.selectbox("Local", list(locais.keys())) if locais else c2.text_input("Local")
                 if st.form_submit_button("Criar Atividade", use_container_width=True):
                     local_id = locais.get(local_sel) if locais else None
                     
@@ -174,7 +173,7 @@ def app(obra_id):
                         "local_id": local_id,
                         "atividade_nome": atv_sel.upper(),
                         "responsavel_execucao": resp_input.upper(),
-                        "status_liberacao": status_input
+                        "status_liberacao": "Liberado"
                     }
                     supabase.table("pcp_medio_prazo").insert(payload).execute()
                     st.success("Pacote criado!")
@@ -210,25 +209,10 @@ def app(obra_id):
             
             for idx, row in pacotes.iterrows():
                 with cols[idx % 3]:
-                    status = row['status_liberacao']
-                    cor_bg = "#333"
-                    cor_txt = "#fff"
                     
-                    if status == 'Liberado':
-                        cor_bg = "rgba(74, 222, 128, 0.2)" 
-                        cor_txt = "#4ADE80"
-                    elif status == 'Bloqueado':
-                        cor_bg = "rgba(239, 68, 68, 0.2)" 
-                        cor_txt = "#EF4444"
-                    elif status == 'Em Analise':
-                        cor_bg = "rgba(250, 204, 21, 0.2)" 
-                        cor_txt = "#FACC15"
 
                     st.markdown(f"""
                     <div class="mp-card">
-                        <span class="mp-badge" style="background-color: {cor_bg}; color: {cor_txt}; border: 1px solid {cor_txt};">
-                            {status}
-                        </span>
                         <div class="mp-local">{row['local_nome']}</div>
                         <div class="mp-title">{row['atividade_nome']}</div>
                         <div class="mp-resp">{row['responsavel_execucao'] or 'Nao atribuido'}</div>
@@ -237,21 +221,11 @@ def app(obra_id):
                     
                     st.markdown("</div></div>", unsafe_allow_html=True)
                     
-                    c_act1, c_act2 = st.columns(2)
-                    with c_act1:
-                        if status != "Liberado":
-                            if st.button("Liberar", key=f"lib_{row['id']}", use_container_width=True):
-                                update_status(row['id'], "Liberado")
-                        else:
-                            if st.button("Bloquear", key=f"bloq_{row['id']}", use_container_width=True):
-                                update_status(row['id'], "Bloqueado")
-                                
-                    with c_act2:
-                        if is_admin:
-                            if st.button("Excluir", key=f"del_{row['id']}", use_container_width=True):
-                                delete_package(row['id'])
-                        else:
-                             st.button("Excluir", key=f"del_{row['id']}", disabled=True, use_container_width=True)
+                    if is_admin:
+                        if st.button("Excluir", key=f"del_{row['id']}", use_container_width=True):
+                            delete_package(row['id'])
+                    else:
+                         st.button("Excluir", key=f"del_{row['id']}", disabled=True, use_container_width=True)
 
                     st.markdown("</div>", unsafe_allow_html=True) 
 
