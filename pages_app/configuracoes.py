@@ -102,14 +102,18 @@ def render_atividades_padrao(supabase):
         nova_atv = c_add.text_input("Nome da Atividade")
         if c_add.button("CADASTRAR ATIVIDADE"):
             if nova_atv:
-                supabase.table("pcp_atividades_padrao").insert({"atividade": nova_atv.upper()}).execute()
-                st.success("Cadastrada!")
-                time.sleep(0.5)
-                st.rerun()
+                try:
+                    supabase.table("pcp_atividades_padrao").insert({"atividade": nova_atv.upper()}).execute()
+                    st.success("Cadastrada!")
+                    time.sleep(0.5)
+                    st.rerun()
+                except Exception as e:
+                    st.warning(f"Erro: Essa atividade provavelmente já está cadastrada.")
 
     try:
         resp = supabase.table("pcp_atividades_padrao").select("*").order("atividade").execute()
         atvs = resp.data
+    
         
         if not atvs:
             st.info("Nenhuma atividade padrão.")
