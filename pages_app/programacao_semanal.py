@@ -152,40 +152,52 @@ def app(obra_id):
     except: pass
 
     with st.expander("Nova Atividade", expanded=False):
-        c_a, c_b, c_c = st.columns(3)
-
+        c_top = st.container()
+        
+        c_a, c_b, c_c = c_top.columns(3)
+        
+        local_val = c_b.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
         with c_a:
             usar_texto = st.toggle("Digitar Manualmente?", key="tgg_atv_manual")
             if usar_texto:
                 atividade_val = st.text_input("Nome da Atividade", placeholder="Digite a atividade...")
             else:
                 atividade_val = st.selectbox("Atividade Padrão", lista_atividades) if lista_atividades else st.text_input("Atividade")
-        local = c_b.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
-        equipe = c_c.text_input("Equipe")
-        detalhe = st.text_input("Detalhe / Recurso")
         
+        equipe_val = c_c.text_input("Equipe")
+        
+        detalhe_val = c_top.text_input("Detalhe / Recurso")
+
         st.markdown("**Planejamento Inicial**")
-        r1, r2, r3, r4, r5 = st.columns(5)
+        r1, r2, r3, r4, r5 = c_top.columns(5)
         rec_seg = r1.text_input("Seg", key="n_seg")
         rec_ter = r2.text_input("Ter", key="n_ter")
         rec_qua = r3.text_input("Qua", key="n_qua")
         rec_qui = r4.text_input("Qui", key="n_qui")
         rec_sex = r5.text_input("Sex", key="n_sex")
 
-        if st.form_submit_button("Lançar Atividade", use_container_width=True):
-            dados = {
-                "obra_id": obra_id,
-                "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
-                "local": str(local).upper(),
-                "atividade": str(atividade_val).upper(),
-                "detalhe": str(detalhe).upper(),
-                "encarregado": str(equipe).upper(),
-                "rec_seg": rec_seg, "rec_ter": rec_ter, "rec_qua": rec_qua,
-                "rec_qui": rec_qui, "rec_sex": rec_sex,
-                "status": "A Iniciar"
-            }
-            supabase.table("pcp_programacao_semanal").insert(dados).execute()
-            st.rerun()
+        if c_top.button("Lançar Atividade", type="primary", use_container_width=True):
+            if not atividade_val:
+                st.warning("Preencha a atividade.")
+            else:
+                dados = {
+                    "obra_id": obra_id,
+                    "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
+                    "local": str(local_val).upper(),
+                    "atividade": str(atividade_val).upper(),
+                    "detalhe": str(detalhe_val).upper(),
+                    "encarregado": str(equipe_val).upper(),
+                    "rec_seg": rec_seg, "rec_ter": rec_ter, "rec_qua": rec_qua,
+                    "rec_qui": rec_qui, "rec_sex": rec_sex,
+                    "status": "A Iniciar"
+                }
+                try:
+                    supabase.table("pcp_programacao_semanal").insert(dados).execute()
+                    st.toast("Lançado com sucesso!")
+                    time.sleep(0.5)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao salvar: {e}")
     st.markdown("---")
 
     response = supabase.table("pcp_programacao_semanal").select("*")\
