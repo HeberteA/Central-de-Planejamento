@@ -146,8 +146,20 @@ def app(obra_id):
 
             with st.form("form_novo_pacote", clear_on_submit=True):
                 c1, c2, c3 = st.columns(3)
-                semana_sel = c1.selectbox("Semana", lista_semanas)
-                local_sel = c2.selectbox("Local", list(locais.keys())) if locais else c2.text_input("Local")
+                with c1:
+                    c_form = st.container()   
+                    usar_texto = st.toggle("Digitar nova atividade?", key="toggle_sem")
+                    if usar_texto:
+                        atv_sel = st.text_input("Nome da Atividade", placeholder="Digite aqui...")
+                    else:
+                        atividades_padrao = []
+                        try:
+                            r = supabase.table("pcp_atividades_padrao").select("atividade").execute()
+                            atividades_padrao = [a['atividade'] for a in r.data]
+                        except: pass
+                        atv_sel = st.selectbox("Selecionar Atividade", atividades_padrao) if atividades_padrao else st.text_input("Atividade")
+                semana_sel = c2.selectbox("Semana", lista_semanas)
+                local_sel = c3.selectbox("Local", list(locais.keys())) if locais else c2.text_input("Local")
                 atv_sel = c3.selectbox("Atividade", atividades) if atividades else c3.text_input("Atividade")
                 
                 c4, c5 = st.columns(2)
@@ -161,8 +173,8 @@ def app(obra_id):
                         "obra_id": obra_id,
                         "semana_ref": semana_sel,
                         "local_id": local_id,
-                        "atividade_nome": atv_sel,
-                        "responsavel_execucao": resp_input,
+                        "atividade_nome": atv_sel.upper(),
+                        "responsavel_execucao": resp_input.upper(),
                         "status_liberacao": status_input
                     }
                     supabase.table("pcp_medio_prazo").insert(payload).execute()
