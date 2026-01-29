@@ -1,0 +1,7 @@
+streamlit
+pandas
+numpy
+supabase
+plotly
+openpyxl
+streamlit-option-menu

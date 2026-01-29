@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+
+.stApp {
+    background: radial-gradient(circle at 10% 20%, #3a3a44 0%, #050505 90%);
+    background-attachment: fixed;
+}
+
+.glass-card {
+    background: rgba(30, 30, 30, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    transition: transform 0.2s;
+}
+
+.glass-card:hover {
+    transform: translateY(-5px);
+    border-color: #E37026; 
+}
+
+h1, h2, h3 {
+    color: #FFFFFF !important;
+    font-weight: 800 !important;
+}
+
+h1 span, h2 span {
+    color: #E37026; 
+}
+
+.stButton > button {
+    background-color: transparent;
+    border: 1px solid #E37026;
+    color: #E37026;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.stButton > button:hover {
+    background-color: #E37026;
+    color: white;
+    border-color: #E37026;
+    box-shadow: 0 0 15px rgba(227, 112, 38, 0.5);
+}
+
+section[data-testid="stSidebar"] {
+    background-color: radial-gradient(circle at 10% 20%, #1e1e24 0%, #050505 90%);
+    border-right: 1px solid #333;
+}
