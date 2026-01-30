@@ -95,6 +95,14 @@ def app(obra_id):
             text-transform: uppercase;
             float: right;
         }
+        /* Ajuste do Checkbox e Input no Formulario */
+        .day-input-group {
+            background: #262626;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            text-align: center;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -141,9 +149,9 @@ def app(obra_id):
         
         c_a, c_b, c_c = c_top.columns(3)
         
-        local_val = c_a.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
+        local_val = c_b.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
         
-        with c_b:
+        with c_a:
             usar_texto = st.toggle("Digitar Manualmente?", key="tgg_atv_manual")
             if usar_texto:
                 atividade_val = st.text_input("Nome da Atividade", placeholder="Digite a atividade...")
@@ -151,32 +159,37 @@ def app(obra_id):
                 atividade_val = st.selectbox("Atividade Padrao", lista_atividades) if lista_atividades else st.text_input("Atividade")
         
         equipe_val = c_c.text_input("Equipe")
-        
         detalhe_val = c_top.text_input("Detalhe / Recurso")
 
-        st.markdown("**Dias de Execucao**")
+        st.markdown("###### Dias de Execucao (Marque e Defina a Qtd/Meta)")
         
         c_days = c_top.container()
-        cd1, cd2, cd3, cd4, cd5 = c_days.columns(5)
+        cols_dias = c_days.columns(5)
+        dias_labels = ["Segunda", "Terca", "Quarta", "Quinta", "Sexta"]
+        dias_keys = ["seg", "ter", "qua", "qui", "sex"]
         
-        chk_seg = cd1.checkbox("Segunda", key="new_seg")
-        chk_ter = cd2.checkbox("Terca", key="new_ter")
-        chk_qua = cd3.checkbox("Quarta", key="new_qua")
-        chk_qui = cd4.checkbox("Quinta", key="new_qui")
-        chk_sex = cd5.checkbox("Sexta", key="new_sex")
+        valores_dias = {}
 
-        if c_top.button("Lancar Atividade", type="primary", use_container_width=True):
+        for i, col in enumerate(cols_dias):
+            dia_key = dias_keys[i]
+            with col:
+                st.markdown(f"<div style='text-align:center; font-weight:bold; font-size:0.8rem; margin-bottom:5px;'>{dias_labels[i]}</div>", unsafe_allow_html=True)
+                use_day = st.checkbox("Incluir", key=f"chk_new_{dia_key}", label_visibility="collapsed")
+                val_day = st.text_input("Qtd", key=f"txt_new_{dia_key}", disabled=not use_day, label_visibility="collapsed", placeholder="-")
+                
+                if use_day:
+                    valores_dias[dia_key] = val_day if val_day else "1"
+                else:
+                    valores_dias[dia_key] = None
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if c_top.button("Lançar Atividade", type="primary", use_container_width=True):
             if not atividade_val:
                 st.warning("Preencha a atividade.")
-            elif not (chk_seg or chk_ter or chk_qua or chk_qui or chk_sex):
+            elif not any(valores_dias.values()):
                 st.warning("Selecione pelo menos um dia da semana.")
             else:
-                val_seg = "1" if chk_seg else None
-                val_ter = "1" if chk_ter else None
-                val_qua = "1" if chk_qua else None
-                val_qui = "1" if chk_qui else None
-                val_sex = "1" if chk_sex else None
-
                 dados = {
                     "obra_id": obra_id,
                     "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
@@ -184,8 +197,11 @@ def app(obra_id):
                     "atividade": str(atividade_val).upper(),
                     "detalhe": str(detalhe_val).upper(),
                     "encarregado": str(equipe_val).upper(),
-                    "rec_seg": val_seg, "rec_ter": val_ter, "rec_qua": val_qua,
-                    "rec_qui": val_qui, "rec_sex": val_sex,
+                    "rec_seg": valores_dias["seg"], 
+                    "rec_ter": valores_dias["ter"], 
+                    "rec_qua": valores_dias["qua"],
+                    "rec_qui": valores_dias["qui"], 
+                    "rec_sex": valores_dias["sex"],
                     "status": "A Iniciar"
                 }
                 try:
@@ -326,7 +342,7 @@ def app(obra_id):
                         txt = st.text_input("r", value=db_val_rec, key=f"txt_{label}_{suffix_id}", label_visibility="collapsed")
                         return chk, txt
                     else:
-                        st.markdown("<div style='height: 28px; background: #222; border-radius: 4px;'></div>", unsafe_allow_html=True)
+                        st.markdown("<div style='height: 28px; background: #222; border-radius: 4px; opacity: 0.3;'></div>", unsafe_allow_html=True)
                         return False, None
 
             chk_seg, txt_seg = day_widget(d1, "SEG", row['rec_seg'], row['feito_seg'], row['id'])
@@ -374,7 +390,7 @@ def app(obra_id):
                     st.rerun()
 
             with c_btn2:
-                if st.button("EXCLUIR", key=f"del_{row['id']}", type="primary", use_container_width=True):
+                if st.button("Excluir", key=f"del_{row['id']}", type="primary", use_container_width=True):
                     supabase.table("pcp_programacao_semanal").delete().eq("id", row['id']).execute()
                     st.rerun()
 
@@ -386,7 +402,7 @@ def app(obra_id):
     with st.expander("Finalizar Semana"):
         st.warning("Ao finalizar, os indicadores desta semana serao salvos no historico.")
         
-        if st.button("Confirmar Fechamento",use_container_width=True, type="primary"):
+        if st.button("Confirmar Fechamento", type="primary", use_container_width=True):
             try:
                 supabase.table("pcp_historico_indicadores").delete().eq("obra_id", obra_id).eq("data_inicio_semana", start_week.strftime('%Y-%m-%d')).execute()
                 
