@@ -7,49 +7,65 @@ from modules import database
 from modules import ui
 
 def load_data(supabase, obra_id, start_date, end_date):
-    resp_ind = supabase.table("pcp_historico_indicadores")\
-        .select("*")\
-        .eq("obra_id", obra_id)\
-        .gte("data_referencia", start_date)\
-        .lte("data_referencia", end_date)\
-        .order("data_referencia").execute()
-    
+    def apply_query(table, date_col):
+        q = supabase.table(table).select("*")
+        if obra_id: 
+            q = q.eq("obra_id", obra_id)
+        
+        if date_col:
+            q = q.gte(date_col, start_date).lte(date_col, end_date)
+        
+        if date_col:
+            q = q.order(date_col)
+            
+        return q.execute()
+
+    resp_ind = apply_query("pcp_historico_indicadores", "data_referencia")
     df_ind = pd.DataFrame(resp_ind.data) if resp_ind.data else pd.DataFrame()
 
-    if not df_ind.empty and 'tipo_indicador' in df_ind.columns:
-        df_ind['data_ref'] = pd.to_datetime(df_ind['data_referencia']).dt.date
-        df_pivot = df_ind.pivot_table(index='data_ref', columns='tipo_indicador', values='valor_percentual', aggfunc='mean').reset_index()
-        df_pivot.columns = [str(c).lower() for c in df_pivot.columns]
-        
-        if 'ppc' not in df_pivot.columns: df_pivot['ppc'] = 0
-        if 'pap' not in df_pivot.columns: df_pivot['pap'] = 0
-        
-        df_ind = df_pivot
-        df_ind.rename(columns={'data_ref': 'data'}, inplace=True)
-    elif not df_ind.empty:
+    if not df_ind.empty:
         if 'data_referencia' in df_ind.columns:
-            df_ind['data'] = pd.to_datetime(df_ind['data_referencia']).dt.date
+            df_ind['data_ref'] = pd.to_datetime(df_ind['data_referencia']).dt.date
+            
+            if 'tipo_indicador' in df_ind.columns:
+                df_pivot = df_ind.pivot_table(
+                    index='data_ref', 
+                    columns='tipo_indicador', 
+                    values='valor_percentual', 
+                    aggfunc='mean' 
+                ).reset_index()
+                
+                df_pivot.columns = [str(c).lower() for c in df_pivot.columns]
+                
+                if 'ppc' not in df_pivot.columns: df_pivot['ppc'] = 0
+                if 'pap' not in df_pivot.columns: df_pivot['pap'] = 0
+                
+                df_ind = df_pivot
+                df_ind.rename(columns={'data_ref': 'data'}, inplace=True)
+            else:
+                df_ind['data'] = df_ind['data_ref']
     else:
         df_ind = pd.DataFrame(columns=['data', 'ppc', 'pap'])
 
-    resp_irr = supabase.table("pcp_historico_irr")\
-        .select("*")\
-        .eq("obra_id", obra_id)\
-        .gte("data_referencia", start_date)\
-        .lte("data_referencia", end_date)\
-        .order("data_referencia").execute()
+    resp_irr = apply_query("pcp_historico_irr", "data_referencia")
     df_irr = pd.DataFrame(resp_irr.data) if resp_irr.data else pd.DataFrame()
+    
     if not df_irr.empty:
         df_irr['data'] = pd.to_datetime(df_irr['data_referencia']).dt.date
+        if obra_id is None:
+            df_irr = df_irr.groupby('data').agg({
+                'restricoes_totais': 'sum',
+                'restricoes_removidas': 'sum'
+            }).reset_index()
+            df_irr['irr_percentual'] = (df_irr['restricoes_removidas'] / df_irr['restricoes_totais'] * 100).fillna(0)
 
-    resp_prob = supabase.table("pcp_historico_problemas")\
-        .select("*")\
-        .eq("obra_id", obra_id)\
-        .gte("data_referencia", start_date)\
-        .lte("data_referencia", end_date).execute()
+    resp_prob = apply_query("pcp_historico_problemas", "data_referencia")
     df_prob = pd.DataFrame(resp_prob.data) if resp_prob.data else pd.DataFrame()
 
-    resp_rest = supabase.table("pcp_restricoes").select("*").eq("obra_id", obra_id).eq("status", "Pendente").execute()
+    q_rest = supabase.table("pcp_restricoes").select("*").eq("status", "Pendente")
+    if obra_id:
+        q_rest = q_rest.eq("obra_id", obra_id)
+    resp_rest = q_rest.execute()
     df_rest_atuais = pd.DataFrame(resp_rest.data) if resp_rest.data else pd.DataFrame()
 
     return df_ind, df_irr, df_prob, df_rest_atuais
@@ -68,40 +84,38 @@ def app(obra_id_param):
     supabase = database.get_db_client()
     user = st.session_state.get('user', {})
     is_admin = user.get('role') == 'admin'
-
-    obra_id = obra_id_param
-    if is_admin:
-        try:
-            obras_resp = supabase.table("pcp_obras").select("id, nome").order("nome").execute()
-            if obras_resp.data:
-                lista_obras = {o['nome']: o['id'] for o in obras_resp.data}
-                
-                current_index = 0
-                ids_list = list(lista_obras.values())
-                if obra_id in ids_list:
-                    current_index = ids_list.index(obra_id)
-                
-                selected_nome = st.selectbox("Selecione a Obra (Admin)", list(lista_obras.keys()), index=current_index)
-                obra_id = lista_obras[selected_nome]
-        except: pass
-
+    
     c_filtros = st.container()
-    col_f1, col_f2 = c_filtros.columns([3, 1])
+    col_f1, col_f2 = c_filtros.columns([1, 1])
     
     with col_f1:
+        obra_id = obra_id_param
+        if is_admin:
+            try:
+                obras_resp = supabase.table("pcp_obras").select("id, nome").order("nome").execute()
+                if obras_resp.data:
+                    opcoes = {"TODAS AS OBRAS": None}
+                    for o in obras_resp.data:
+                        opcoes[o['nome']] = o['id']
+                
+                    idx_selecionado = 0
+                    if obra_id_param in opcoes.values():
+                        nome_atual = [k for k, v in opcoes.items() if v == obra_id_param][0]
+                        idx_selecionado = list(opcoes.keys()).index(nome_atual)
+                
+                    selected_nome = st.selectbox("Visualizar:", list(opcoes.keys()), index=idx_selecionado)
+                    obra_id = opcoes[selected_nome] 
+            except: pass
+
+    with col_f2:
         d_end = datetime.now()
         d_start = d_end - timedelta(days=90)
-        dates = st.date_input("Periodo de Analise", [d_start, d_end])
+        dates = st.date_input("Periodo", [d_start, d_end])
         
         if len(dates) == 2:
             s_date, e_date = dates
         else:
             s_date, e_date = d_start, d_end
-            
-    with col_f2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Atualizar Dados", use_container_width=True):
-            st.rerun()
 
     df_ind, df_irr, df_prob, df_rest_atuais = load_data(supabase, obra_id, s_date.strftime('%Y-%m-%d'), e_date.strftime('%Y-%m-%d'))
 
