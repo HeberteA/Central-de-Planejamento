@@ -339,7 +339,7 @@ def app(obra_id):
                     st.markdown(f"<div class='day-label'>{label}</div>", unsafe_allow_html=True)
                     if not is_disabled:
                         chk = st.checkbox("ok", value=db_val_chk, key=f"chk_{label}_{suffix_id}", label_visibility="collapsed")
-                        txt = st.text_area("r", value=db_val_rec, key=f"txt_{label}_{suffix_id}", label_visibility="collapsed", height=70)
+                        txt = st.text_area("r", value=db_val_rec, key=f"txt_{label}_{suffix_id}", label_visibility="collapsed", height=35)
                         return chk, txt
                     else:
                         st.markdown("<div style='height: 28px; background: #222; border-radius: 4px; opacity: 0.3;'></div>", unsafe_allow_html=True)
