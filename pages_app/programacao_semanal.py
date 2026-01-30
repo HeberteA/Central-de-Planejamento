@@ -106,14 +106,14 @@ def app(obra_id):
     </style>
     """, unsafe_allow_html=True)
 
-    ui.header("Programacao Semanal")
+    st.markdown("# Programação Semanal")
 
     user = st.session_state['user']
     is_admin = user.get('role') == 'admin'
 
     c1, c2 = st.columns([1, 2])
     with c1:
-        data_ref = st.date_input("Semana de Referencia", datetime.now())
+        data_ref = st.date_input("Semana de Referência", datetime.now())
         start_week = data_ref - timedelta(days=data_ref.weekday())
         end_week = start_week + timedelta(days=4)
     
@@ -149,9 +149,9 @@ def app(obra_id):
         
         c_a, c_b, c_c = c_top.columns(3)
         
-        local_val = c_b.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
+        local_val = c_a.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
         
-        with c_a:
+        with c_b:
             usar_texto = st.toggle("Digitar Manualmente?", key="tgg_atv_manual")
             if usar_texto:
                 atividade_val = st.text_input("Nome da Atividade", placeholder="Digite a atividade...")
@@ -161,8 +161,6 @@ def app(obra_id):
         equipe_val = c_c.text_input("Equipe")
         detalhe_val = c_top.text_input("Detalhe / Recurso")
 
-        st.markdown("###### Dias de Execucao (Marque e Defina a Qtd/Meta)")
-        
         c_days = c_top.container()
         cols_dias = c_days.columns(5)
         dias_labels = ["Segunda", "Terca", "Quarta", "Quinta", "Sexta"]
@@ -221,32 +219,34 @@ def app(obra_id):
     
     df = pd.DataFrame(response.data)
 
-    total_pap = 0
+    total_atividades = 0
+    total_concluidas = 0
+    
     total_dias_programados = 0
-    total_dias_feitos = 0
-    ppc = 0.0
+    total_dias_executados = 0
+    
+    ppc_percent = 0.0
+    pap_percent = 0.0
 
     if not df.empty and 'status' in df.columns:
-        total_pap = len(df)
+        total_atividades = len(df)
+        total_concluidas = len(df[df['status'] == 'Concluido'])
+        
+        if total_atividades > 0:
+            ppc_percent = (total_concluidas / total_atividades) * 100
         
         for idx, row in df.iterrows():
-            dias_prog = 0
-            dias_ok = 0
-            
             for dia in ['seg', 'ter', 'qua', 'qui', 'sex']:
                 rec_val = row.get(f'rec_{dia}')
                 feito_val = row.get(f'feito_{dia}')
                 
                 if rec_val and str(rec_val).strip() != '':
-                    dias_prog += 1
+                    total_dias_programados += 1
                     if feito_val is True:
-                        dias_ok += 1
-            
-            total_dias_programados += dias_prog
-            total_dias_feitos += dias_ok
-
+                        total_dias_executados += 1
+        
         if total_dias_programados > 0:
-            ppc = (total_dias_feitos / total_dias_programados) * 100
+            pap_percent = (total_dias_executados / total_dias_programados) * 100
     else:
         df = pd.DataFrame(columns=['id', 'status', 'local', 'atividade', 'detalhe', 'encarregado', 
                                    'rec_seg', 'feito_seg', 'rec_ter', 'feito_ter', 
@@ -256,24 +256,24 @@ def app(obra_id):
     st.markdown(f"""
     <div class="kpi-container">
         <div class="kpi-card" style="border-bottom: 3px solid #E37026;">
-            <div class="kpi-title">PAP (Atividades)</div>
-            <div class="kpi-value">{total_pap}</div>
-            <div class="kpi-sub">Total Programado</div>
-        </div>
-        <div class="kpi-card" style="border-bottom: 3px solid #4ADE80;">
-            <div class="kpi-title">Dias Concluidos</div>
-            <div class="kpi-value">{total_dias_feitos}/{total_dias_programados}</div>
-            <div class="kpi-sub">Execucao diaria</div>
+            <div class="kpi-title">Total Atividades</div>
+            <div class="kpi-value">{total_atividades}</div>
+            <div class="kpi-sub">{total_concluidas} Concluidas</div>
         </div>
         <div class="kpi-card" style="border-bottom: 3px solid #3B82F6;">
-            <div class="kpi-title">PPC Semanal</div>
-            <div class="kpi-value">{ppc:.1f}%</div>
-            <div class="kpi-sub">Aderencia</div>
+            <div class="kpi-title">PPC (Semanal)</div>
+            <div class="kpi-value">{ppc_percent:.1f}%</div>
+            <div class="kpi-sub">Conclusao Status</div>
+        </div>
+        <div class="kpi-card" style="border-bottom: 3px solid #4ADE80;">
+            <div class="kpi-title">PAP (Diario)</div>
+            <div class="kpi-value">{pap_percent:.1f}%</div>
+            <div class="kpi-sub">Aderencia Dias</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    if df.empty or total_pap == 0:
+    if df.empty or total_atividades == 0:
         st.info("Nenhuma atividade programada para esta semana.")
         return
 
@@ -406,14 +406,12 @@ def app(obra_id):
             try:
                 supabase.table("pcp_historico_indicadores").delete().eq("obra_id", obra_id).eq("data_inicio_semana", start_week.strftime('%Y-%m-%d')).execute()
                 
-                atv_concluidas_count = len(df[df['status'] == 'Concluido'])
-                
                 dados_ind = {
                     "obra_id": obra_id,
                     "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
-                    "pap": total_pap,
-                    "atividades_concluidas": atv_concluidas_count,
-                    "ppc": ppc,
+                    "pap": pap_percent,
+                    "atividades_concluidas": total_concluidas,
+                    "ppc": ppc_percent,
                     "data_fechamento": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
                 supabase.table("pcp_historico_indicadores").insert(dados_ind).execute()
