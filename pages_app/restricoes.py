@@ -161,7 +161,6 @@ def render_boards(df, supabase):
     col_pend, col_res = st.columns(2)
 
     with col_pend:
-        st.markdown('<div class="col-wrapper">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">RESTRIÇÕES (POR MÊS)</div>', unsafe_allow_html=True)
         
         df_pend = df[df['status'] == 'Pendente'].copy()
@@ -210,7 +209,6 @@ def render_boards(df, supabase):
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_res:
-        st.markdown('<div class="col-wrapper">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">REMOVIDAS (POR SEMANA)</div>', unsafe_allow_html=True)
         
         df_res = df[df['status'] == 'Removida'].copy()
