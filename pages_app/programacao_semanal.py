@@ -149,9 +149,9 @@ def app(obra_id):
         
         c_a, c_b, c_c = c_top.columns(3)
         
-        local_val = c_a.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
+        local_val = c_b.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
         
-        with c_b:
+        with c_a:
             usar_texto = st.toggle("Digitar Manualmente?", key="tgg_atv_manual")
             if usar_texto:
                 atividade_val = st.text_input("Nome da Atividade", placeholder="Digite a atividade...")
