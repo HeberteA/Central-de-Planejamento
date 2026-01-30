@@ -4,19 +4,19 @@ from datetime import datetime, timedelta
 import time
 from modules import database
 from modules import ui
+import json
 
 def update_record(id, field, value):
     supabase = database.get_db_client()
     try:
         supabase.table("pcp_programacao_semanal").update({field: value}).eq("id", id).execute()
-        st.toast("Salvo!", icon="✅")
+        st.toast("Salvo!", icon="Success")
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
 
 def app(obra_id):
     st.markdown("""
     <style>
-        /* Container KPI no Topo */
         .kpi-container {
             display: flex;
             gap: 15px;
@@ -49,8 +49,6 @@ def app(obra_id):
             font-size: 0.75rem;
             color: #666;
         }
-        
-        /* Container do Card de Atividade */
         .task-card {
             background-color: #1E1E1E;
             border: 1px solid #333;
@@ -65,8 +63,6 @@ def app(obra_id):
             border-color: #555;
             transform: translateY(-2px);
         }
-
-        /* Tipografia do Card */
         .card-header-text {
             color: #fff;
             font-weight: 700;
@@ -78,8 +74,6 @@ def app(obra_id):
             text-transform: uppercase;
             margin-bottom: 5px;
         }
-        
-        /* Area de Inputs dos Dias */
         .day-box {
             background: rgba(255,255,255,0.03);
             padding: 5px;
@@ -93,15 +87,6 @@ def app(obra_id):
             margin-bottom: 2px;
             font-weight: bold;
         }
-        
-        /* Destaque para Causa Raiz */
-        .problem-alert {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px dashed #EF4444;
-            padding: 10px;
-            border-radius: 6px;
-            margin-top: 10px;
-        }
         .status-badge {
             padding: 4px 8px;
             border-radius: 4px;
@@ -113,7 +98,7 @@ def app(obra_id):
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("# Programação Semanal")
+    ui.header("Programacao Semanal")
 
     user = st.session_state['user']
     is_admin = user.get('role') == 'admin'
@@ -156,30 +141,42 @@ def app(obra_id):
         
         c_a, c_b, c_c = c_top.columns(3)
         
-        local_val = c_b.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
-        with c_a:
+        local_val = c_a.selectbox("Local", lista_locais) if lista_locais else c_a.text_input("Local")
+        
+        with c_b:
             usar_texto = st.toggle("Digitar Manualmente?", key="tgg_atv_manual")
             if usar_texto:
                 atividade_val = st.text_input("Nome da Atividade", placeholder="Digite a atividade...")
             else:
-                atividade_val = st.selectbox("Atividade Padrão", lista_atividades) if lista_atividades else st.text_input("Atividade")
+                atividade_val = st.selectbox("Atividade Padrao", lista_atividades) if lista_atividades else st.text_input("Atividade")
         
         equipe_val = c_c.text_input("Equipe")
         
         detalhe_val = c_top.text_input("Detalhe / Recurso")
 
-        st.markdown("**Planejamento Inicial**")
-        r1, r2, r3, r4, r5 = c_top.columns(5)
-        rec_seg = r1.text_input("Seg", key="n_seg")
-        rec_ter = r2.text_input("Ter", key="n_ter")
-        rec_qua = r3.text_input("Qua", key="n_qua")
-        rec_qui = r4.text_input("Qui", key="n_qui")
-        rec_sex = r5.text_input("Sex", key="n_sex")
+        st.markdown("**Dias de Execucao**")
+        
+        c_days = c_top.container()
+        cd1, cd2, cd3, cd4, cd5 = c_days.columns(5)
+        
+        chk_seg = cd1.checkbox("Segunda", key="new_seg")
+        chk_ter = cd2.checkbox("Terca", key="new_ter")
+        chk_qua = cd3.checkbox("Quarta", key="new_qua")
+        chk_qui = cd4.checkbox("Quinta", key="new_qui")
+        chk_sex = cd5.checkbox("Sexta", key="new_sex")
 
-        if c_top.button("Lançar Atividade", type="primary", use_container_width=True):
+        if c_top.button("Lancar Atividade", type="primary", use_container_width=True):
             if not atividade_val:
                 st.warning("Preencha a atividade.")
+            elif not (chk_seg or chk_ter or chk_qua or chk_qui or chk_sex):
+                st.warning("Selecione pelo menos um dia da semana.")
             else:
+                val_seg = "1" if chk_seg else None
+                val_ter = "1" if chk_ter else None
+                val_qua = "1" if chk_qua else None
+                val_qui = "1" if chk_qui else None
+                val_sex = "1" if chk_sex else None
+
                 dados = {
                     "obra_id": obra_id,
                     "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
@@ -187,17 +184,18 @@ def app(obra_id):
                     "atividade": str(atividade_val).upper(),
                     "detalhe": str(detalhe_val).upper(),
                     "encarregado": str(equipe_val).upper(),
-                    "rec_seg": rec_seg, "rec_ter": rec_ter, "rec_qua": rec_qua,
-                    "rec_qui": rec_qui, "rec_sex": rec_sex,
+                    "rec_seg": val_seg, "rec_ter": val_ter, "rec_qua": val_qua,
+                    "rec_qui": val_qui, "rec_sex": val_sex,
                     "status": "A Iniciar"
                 }
                 try:
                     supabase.table("pcp_programacao_semanal").insert(dados).execute()
-                    st.toast("Lançado com sucesso!")
+                    st.toast("Lancado com sucesso!")
                     time.sleep(0.5)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
+    
     st.markdown("---")
 
     response = supabase.table("pcp_programacao_semanal").select("*")\
@@ -207,41 +205,60 @@ def app(obra_id):
     
     df = pd.DataFrame(response.data)
 
-    if df.empty or 'status' not in df.columns:
+    total_pap = 0
+    total_dias_programados = 0
+    total_dias_feitos = 0
+    ppc = 0.0
+
+    if not df.empty and 'status' in df.columns:
+        total_pap = len(df)
+        
+        for idx, row in df.iterrows():
+            dias_prog = 0
+            dias_ok = 0
+            
+            for dia in ['seg', 'ter', 'qua', 'qui', 'sex']:
+                rec_val = row.get(f'rec_{dia}')
+                feito_val = row.get(f'feito_{dia}')
+                
+                if rec_val and str(rec_val).strip() != '':
+                    dias_prog += 1
+                    if feito_val is True:
+                        dias_ok += 1
+            
+            total_dias_programados += dias_prog
+            total_dias_feitos += dias_ok
+
+        if total_dias_programados > 0:
+            ppc = (total_dias_feitos / total_dias_programados) * 100
+    else:
         df = pd.DataFrame(columns=['id', 'status', 'local', 'atividade', 'detalhe', 'encarregado', 
                                    'rec_seg', 'feito_seg', 'rec_ter', 'feito_ter', 
                                    'rec_qua', 'feito_qua', 'rec_qui', 'feito_qui', 
                                    'rec_sex', 'feito_sex', 'causa'])
-        total_pap = 0
-        concluidas = 0
-        ppc = 0
-    else:
-        total_pap = len(df)
-        concluidas = len(df[df['status'] == 'Concluido'])
-        ppc = (concluidas / total_pap * 100) if total_pap > 0 else 0
 
     st.markdown(f"""
     <div class="kpi-container">
         <div class="kpi-card" style="border-bottom: 3px solid #E37026;">
-            <div class="kpi-title">PAP (Programado)</div>
+            <div class="kpi-title">PAP (Atividades)</div>
             <div class="kpi-value">{total_pap}</div>
-            <div class="kpi-sub">Atividades</div>
+            <div class="kpi-sub">Total Programado</div>
         </div>
         <div class="kpi-card" style="border-bottom: 3px solid #4ADE80;">
-            <div class="kpi-title">Concluidas</div>
-            <div class="kpi-value">{concluidas}</div>
-            <div class="kpi-sub">Atividades</div>
+            <div class="kpi-title">Dias Concluidos</div>
+            <div class="kpi-value">{total_dias_feitos}/{total_dias_programados}</div>
+            <div class="kpi-sub">Execucao diaria</div>
         </div>
         <div class="kpi-card" style="border-bottom: 3px solid #3B82F6;">
             <div class="kpi-title">PPC Semanal</div>
-            <div class="kpi-value">{ppc:.0f}%</div>
+            <div class="kpi-value">{ppc:.1f}%</div>
             <div class="kpi-sub">Aderencia</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    if df.empty:
-        st.info("Nenhuma atividade programada.")
+    if df.empty or total_pap == 0:
+        st.info("Nenhuma atividade programada para esta semana.")
         return
 
     cols = st.columns(3)
@@ -254,6 +271,7 @@ def app(obra_id):
             if row['status'] == 'Concluido': status_color = "#4ADE80" 
             elif row['status'] == 'Nao Concluido': status_color = "#EF4444" 
             elif row['status'] == 'Em Andamento': status_color = "#E37026" 
+            
             st.markdown(f"""
             <div class="task-card" style="border-left-color: {status_color};">
                 <div class="card-sub-text">{row['local']}</div>
@@ -280,17 +298,16 @@ def app(obra_id):
             selected_causa = row.get('causa') 
             
             if new_status == "Nao Concluido":
-                
                 idx_causa = None
                 if selected_causa and selected_causa in lista_problemas:
                     idx_causa = lista_problemas.index(selected_causa)
                 
                 new_causa = st.selectbox(
-                    "Selecione a Causa do Nao Cumprimento:",
+                    "Motivo:",
                     lista_problemas,
                     index=idx_causa,
                     key=f"causa_{row['id']}",
-                    placeholder="Selecione o motivo..."
+                    placeholder="Selecione..."
                 )
             else:
                 new_causa = None
@@ -301,37 +318,49 @@ def app(obra_id):
             
             def day_widget(col_obj, label, db_val_rec, db_val_chk, suffix_id):
                 with col_obj:
+                    is_disabled = (db_val_rec is None or str(db_val_rec).strip() == '')
+                    
                     st.markdown(f"<div class='day-label'>{label}</div>", unsafe_allow_html=True)
-                    chk = st.checkbox("ok", value=db_val_chk, key=f"chk_{label}_{suffix_id}", label_visibility="collapsed")
-                    txt = st.text_input("r", value=db_val_rec or "", key=f"txt_{label}_{suffix_id}", label_visibility="collapsed")
-                    return chk, txt
+                    if not is_disabled:
+                        chk = st.checkbox("ok", value=db_val_chk, key=f"chk_{label}_{suffix_id}", label_visibility="collapsed")
+                        txt = st.text_input("r", value=db_val_rec, key=f"txt_{label}_{suffix_id}", label_visibility="collapsed")
+                        return chk, txt
+                    else:
+                        st.markdown("<div style='height: 28px; background: #222; border-radius: 4px;'></div>", unsafe_allow_html=True)
+                        return False, None
 
-            day_widget(d1, "SEG", row['rec_seg'], row['feito_seg'], row['id'])
-            day_widget(d2, "TER", row['rec_ter'], row['feito_ter'], row['id'])
-            day_widget(d3, "QUA", row['rec_qua'], row['feito_qua'], row['id'])
-            day_widget(d4, "QUI", row['rec_qui'], row['feito_qui'], row['id'])
-            day_widget(d5, "SEX", row['rec_sex'], row['feito_sex'], row['id'])
+            chk_seg, txt_seg = day_widget(d1, "SEG", row['rec_seg'], row['feito_seg'], row['id'])
+            chk_ter, txt_ter = day_widget(d2, "TER", row['rec_ter'], row['feito_ter'], row['id'])
+            chk_qua, txt_qua = day_widget(d3, "QUA", row['rec_qua'], row['feito_qua'], row['id'])
+            chk_qui, txt_qui = day_widget(d4, "QUI", row['rec_qui'], row['feito_qui'], row['id'])
+            chk_sex, txt_sex = day_widget(d5, "SEX", row['rec_sex'], row['feito_sex'], row['id'])
 
             st.markdown('<div style="margin-top: 5px; border-top: 1px solid #333; padding-top: 10px;">', unsafe_allow_html=True)
             
             c_btn1, c_btn2 = st.columns([2, 1])
             
             with c_btn1:
-                if st.button("SALVAR", key=f"save_{row['id']}", use_container_width=True):
+                if st.button("Salvar", key=f"save_{row['id']}", use_container_width=True):
                     up_data = {
                         "status": st.session_state[f"st_{row['id']}"],
-                        "rec_seg": st.session_state[f"txt_SEG_{row['id']}"],
-                        "feito_seg": st.session_state[f"chk_SEG_{row['id']}"],
-                        "rec_ter": st.session_state[f"txt_TER_{row['id']}"],
-                        "feito_ter": st.session_state[f"chk_TER_{row['id']}"],
-                        "rec_qua": st.session_state[f"txt_QUA_{row['id']}"],
-                        "feito_qua": st.session_state[f"chk_QUA_{row['id']}"],
-                        "rec_qui": st.session_state[f"txt_QUI_{row['id']}"],
-                        "feito_qui": st.session_state[f"chk_QUI_{row['id']}"],
-                        "rec_sex": st.session_state[f"txt_SEX_{row['id']}"],
-                        "feito_sex": st.session_state[f"chk_SEX_{row['id']}"],
                     }
                     
+                    if txt_seg is not None: 
+                        up_data["rec_seg"] = txt_seg
+                        up_data["feito_seg"] = chk_seg
+                    if txt_ter is not None: 
+                        up_data["rec_ter"] = txt_ter
+                        up_data["feito_ter"] = chk_ter
+                    if txt_qua is not None: 
+                        up_data["rec_qua"] = txt_qua
+                        up_data["feito_qua"] = chk_qua
+                    if txt_qui is not None: 
+                        up_data["rec_qui"] = txt_qui
+                        up_data["feito_qui"] = chk_qui
+                    if txt_sex is not None: 
+                        up_data["rec_sex"] = txt_sex
+                        up_data["feito_sex"] = chk_sex
+
                     if st.session_state[f"st_{row['id']}"] == "Nao Concluido":
                         causa_val = st.session_state.get(f"causa_{row['id']}")
                         if causa_val:
@@ -340,7 +369,7 @@ def app(obra_id):
                         up_data['causa'] = None
 
                     supabase.table("pcp_programacao_semanal").update(up_data).eq("id", row['id']).execute()
-                    st.toast("Salvo!", icon="✅")
+                    st.toast("Salvo!", icon="Success")
                     time.sleep(1)
                     st.rerun()
 
@@ -350,3 +379,44 @@ def app(obra_id):
                     st.rerun()
 
             st.markdown("</div></div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("##### Fechamento da Semana")
+    
+    with st.expander("Finalizar Semana"):
+        st.warning("Ao finalizar, os indicadores desta semana serao salvos no historico.")
+        
+        if st.button("Confirmar Fechamento",use_container_width=True, type="primary"):
+            try:
+                supabase.table("pcp_historico_indicadores").delete().eq("obra_id", obra_id).eq("data_inicio_semana", start_week.strftime('%Y-%m-%d')).execute()
+                
+                atv_concluidas_count = len(df[df['status'] == 'Concluido'])
+                
+                dados_ind = {
+                    "obra_id": obra_id,
+                    "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
+                    "pap": total_pap,
+                    "atividades_concluidas": atv_concluidas_count,
+                    "ppc": ppc,
+                    "data_fechamento": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+                supabase.table("pcp_historico_indicadores").insert(dados_ind).execute()
+
+                supabase.table("pcp_historico_problemas").delete().eq("obra_id", obra_id).eq("data_inicio_semana", start_week.strftime('%Y-%m-%d')).execute()
+                
+                causas_series = df[df['status'] == 'Nao Concluido']['causa'].value_counts()
+                for causa, qtd in causas_series.items():
+                    if causa:
+                        dados_prob = {
+                            "obra_id": obra_id,
+                            "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
+                            "problema": causa,
+                            "quantidade": int(qtd),
+                            "data_fechamento": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
+                        supabase.table("pcp_historico_problemas").insert(dados_prob).execute()
+                
+                st.success("Semana finalizada com sucesso!")
+                st.balloons()
+            except Exception as e:
+                st.error(f"Erro ao finalizar: {e}")
