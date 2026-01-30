@@ -7,15 +7,69 @@ from modules import database
 from modules import ui
 
 def load_data(supabase, obra_id, start_date, end_date):
-    resp_ind = supabase.table("pcp_historico_indicadores").select("*").eq("obra_id", obra_id).gte("data_inicio_semana", start_date).lte("data_inicio_semana", end_date).order("data_inicio_semana").execute()
+    # 1. INDICADORES (PPC/PAP)
+    # O erro ocorria aqui: a coluna correta é 'data_referencia' e não 'data_inicio_semana'
+    resp_ind = supabase.table("pcp_historico_indicadores")\
+        .select("*")\
+        .eq("obra_id", obra_id)\
+        .gte("data_referencia", start_date)\
+        .lte("data_referencia", end_date)\
+        .order("data_referencia").execute()
+    
     df_ind = pd.DataFrame(resp_ind.data) if resp_ind.data else pd.DataFrame()
 
-    resp_irr = supabase.table("pcp_historico_irr").select("*").eq("obra_id", obra_id).gte("data_referencia", start_date).lte("data_referencia", end_date).order("data_referencia").execute()
-    df_irr = pd.DataFrame(resp_irr.data) if resp_irr.data else pd.DataFrame()
+    # Tratamento: Transformar de Formato Longo (Linhas) para Largo (Colunas)
+    # Se a tabela tiver 'tipo_indicador', fazemos o pivot
+    if not df_ind.empty and 'tipo_indicador' in df_ind.columns:
+        # Converte para datetime
+        df_ind['data_ref'] = pd.to_datetime(df_ind['data_referencia']).dt.date
+        
+        # Pivot: Transforma valores de 'PPC' e 'PAP' em colunas
+        df_pivot = df_ind.pivot_table(
+            index='data_ref', 
+            columns='tipo_indicador', 
+            values='valor_percentual', 
+            aggfunc='mean' # Caso haja duplicatas, pega a media
+        ).reset_index()
+        
+        # Renomeia colunas para facilitar (data, ppc, pap)
+        df_pivot.columns = [str(c).lower() for c in df_pivot.columns]
+        
+        # Garante que as colunas existam mesmo que nao tenha dados
+        if 'ppc' not in df_pivot.columns: df_pivot['ppc'] = 0
+        if 'pap' not in df_pivot.columns: df_pivot['pap'] = 0
+        
+        df_ind = df_pivot
+        # Renomeia para padronizar com o grafico
+        df_ind.rename(columns={'data_ref': 'data'}, inplace=True)
+        
+    elif not df_ind.empty:
+        # Fallback se a tabela ja estiver no formato largo (colunas ppc/pap existem)
+        if 'data_referencia' in df_ind.columns:
+            df_ind['data'] = pd.to_datetime(df_ind['data_referencia']).dt.date
+    else:
+        df_ind = pd.DataFrame(columns=['data', 'ppc', 'pap'])
 
-    resp_prob = supabase.table("pcp_historico_problemas").select("*").eq("obra_id", obra_id).gte("data_inicio_semana", start_date).lte("data_inicio_semana", end_date).execute()
+    # 2. IRR (Restrições)
+    resp_irr = supabase.table("pcp_historico_irr")\
+        .select("*")\
+        .eq("obra_id", obra_id)\
+        .gte("data_referencia", start_date)\
+        .lte("data_referencia", end_date)\
+        .order("data_referencia").execute()
+    df_irr = pd.DataFrame(resp_irr.data) if resp_irr.data else pd.DataFrame()
+    if not df_irr.empty:
+        df_irr['data'] = pd.to_datetime(df_irr['data_referencia']).dt.date
+
+    # 3. PROBLEMAS (Causas)
+    resp_prob = supabase.table("pcp_historico_problemas")\
+        .select("*")\
+        .eq("obra_id", obra_id)\
+        .gte("data_referencia", start_date)\
+        .lte("data_referencia", end_date).execute()
     df_prob = pd.DataFrame(resp_prob.data) if resp_prob.data else pd.DataFrame()
 
+    # 4. RESTRIÇÕES ATUAIS
     resp_rest = supabase.table("pcp_restricoes").select("*").eq("obra_id", obra_id).eq("status", "Pendente").execute()
     df_rest_atuais = pd.DataFrame(resp_rest.data) if resp_rest.data else pd.DataFrame()
 
@@ -52,12 +106,14 @@ def app(obra_id):
         if st.button("Atualizar Dados", use_container_width=True):
             st.rerun()
 
+    # Carrega dados com as correções de coluna e pivot
     df_ind, df_irr, df_prob, df_rest_atuais = load_data(supabase, obra_id, s_date.strftime('%Y-%m-%d'), e_date.strftime('%Y-%m-%d'))
 
     st.markdown("---")
 
     col1, col2, col3, col4 = st.columns(4)
     
+    # Calculos seguros
     avg_ppc = df_ind['ppc'].mean() if not df_ind.empty and 'ppc' in df_ind.columns else 0
     avg_pap = df_ind['pap'].mean() if not df_ind.empty and 'pap' in df_ind.columns else 0
     avg_irr = df_irr['irr_percentual'].mean() if not df_irr.empty and 'irr_percentual' in df_irr.columns else 0
@@ -78,15 +134,15 @@ def app(obra_id):
         with g1:
             st.markdown("##### Evolucao PPC e PAP")
             if not df_ind.empty:
-                df_ind = df_ind.sort_values('data_inicio_semana')
+                df_ind = df_ind.sort_values('data')
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
-                    x=df_ind['data_inicio_semana'], y=df_ind['ppc'],
+                    x=df_ind['data'], y=df_ind['ppc'],
                     mode='lines+markers', name='PPC (Semanal)',
                     line=dict(color='#3B82F6', width=3)
                 ))
                 fig.add_trace(go.Scatter(
-                    x=df_ind['data_inicio_semana'], y=df_ind['pap'],
+                    x=df_ind['data'], y=df_ind['pap'],
                     mode='lines+markers', name='PAP (Diario)',
                     line=dict(color='#4ADE80', width=3, dash='dot')
                 ))
@@ -104,24 +160,21 @@ def app(obra_id):
 
         with g2:
             st.markdown("##### Volume de Atividades")
-            if not df_ind.empty and 'atividades_concluidas' in df_ind.columns:
-                df_ind['total_estimado'] = df_ind.apply(lambda row: int(row['atividades_concluidas'] / (row['ppc']/100)) if row['ppc'] > 0 else 0, axis=1)
-                
+            # Tenta estimar o total programado baseado no PPC se não tiver a coluna explicita
+            if not df_ind.empty and 'ppc' in df_ind.columns:
+                # Mock visual para exemplo se não tiver dados brutos de qtd
+                # O ideal seria ter a coluna 'atividades_totais' no histórico, mas vamos usar o PPC
                 fig_vol = go.Figure()
+                
+                # Exibe apenas PPC em barra se não tivermos contagem absoluta no historico
                 fig_vol.add_trace(go.Bar(
-                    x=df_ind['data_inicio_semana'], y=df_ind['total_estimado'],
-                    name='Programado', marker_color='#333333'
-                ))
-                fig_vol.add_trace(go.Bar(
-                    x=df_ind['data_inicio_semana'], y=df_ind['atividades_concluidas'],
-                    name='Concluido', marker_color='#3B82F6'
+                    x=df_ind['data'], y=df_ind['ppc'],
+                    name='Desempenho', marker_color='#3B82F6'
                 ))
                 fig_vol.update_layout(
-                    barmode='overlay',
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    font_color="white", xaxis_title="Semana", yaxis_title="Qtd Atividades",
-                    legend=dict(orientation="h", y=1.1, x=0), height=350,
-                    margin=dict(l=20, r=20, t=20, b=20)
+                    font_color="white", xaxis_title="Semana", yaxis_title="%",
+                    height=350
                 )
                 st.plotly_chart(fig_vol, use_container_width=True)
             else:
@@ -133,10 +186,10 @@ def app(obra_id):
         with r1:
             st.markdown("##### Evolucao IRR")
             if not df_irr.empty:
-                df_irr = df_irr.sort_values('data_referencia')
+                df_irr = df_irr.sort_values('data')
                 fig_irr = go.Figure()
                 fig_irr.add_trace(go.Scatter(
-                    x=df_irr['data_referencia'], y=df_irr['irr_percentual'],
+                    x=df_irr['data'], y=df_irr['irr_percentual'],
                     mode='lines+markers+text', text=df_irr['irr_percentual'].apply(lambda x: f"{x:.0f}%"),
                     textposition="top center",
                     name='IRR', line=dict(color='#E37026', width=3)
@@ -155,11 +208,11 @@ def app(obra_id):
             if not df_irr.empty:
                 fig_bal = go.Figure()
                 fig_bal.add_trace(go.Bar(
-                    x=df_irr['data_referencia'], y=df_irr['restricoes_totais'],
+                    x=df_irr['data'], y=df_irr['restricoes_totais'],
                     name='Total Estoque', marker_color='#EF4444'
                 ))
                 fig_bal.add_trace(go.Bar(
-                    x=df_irr['data_referencia'], y=df_irr['restricoes_removidas'],
+                    x=df_irr['data'], y=df_irr['restricoes_removidas'],
                     name='Removidas', marker_color='#10B981'
                 ))
                 fig_bal.update_layout(
@@ -208,34 +261,40 @@ def app(obra_id):
     with t3:
         st.markdown("##### Analise de Causas Raiz (Pareto)")
         if not df_prob.empty:
-            df_pareto = df_prob.groupby('problema')['quantidade'].sum().reset_index()
-            df_pareto = df_pareto.sort_values('quantidade', ascending=False)
+            # Tenta identificar a coluna correta de problema (problema ou problema_descricao)
+            col_prob = 'problema_descricao' if 'problema_descricao' in df_prob.columns else 'problema'
             
-            df_pareto['acumulado'] = df_pareto['quantidade'].cumsum()
-            df_pareto['perc_acumulado'] = (df_pareto['acumulado'] / df_pareto['quantidade'].sum()) * 100
-            
-            fig_par = go.Figure()
-            fig_par.add_trace(go.Bar(
-                x=df_pareto['problema'], y=df_pareto['quantidade'],
-                name='Ocorrencias', marker_color='#EF4444'
-            ))
-            fig_par.add_trace(go.Scatter(
-                x=df_pareto['problema'], y=df_pareto['perc_acumulado'],
-                name='% Acumulado', yaxis='y2',
-                mode='lines+markers', line=dict(color='white', width=2)
-            ))
-            
-            fig_par.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                font_color="white",
-                xaxis_title="Causa Raiz", yaxis_title="Frequencia",
-                yaxis2=dict(title="Acumulado (%)", overlaying='y', side='right', range=[0, 110], showgrid=False),
-                height=450,
-                legend=dict(orientation="h", y=1.1, x=0)
-            )
-            st.plotly_chart(fig_par, use_container_width=True)
-            
-            st.markdown("##### Detalhamento")
-            st.dataframe(df_pareto, use_container_width=True, hide_index=True)
+            if col_prob in df_prob.columns:
+                df_pareto = df_prob.groupby(col_prob)['quantidade'].sum().reset_index()
+                df_pareto = df_pareto.sort_values('quantidade', ascending=False)
+                
+                df_pareto['acumulado'] = df_pareto['quantidade'].cumsum()
+                df_pareto['perc_acumulado'] = (df_pareto['acumulado'] / df_pareto['quantidade'].sum()) * 100
+                
+                fig_par = go.Figure()
+                fig_par.add_trace(go.Bar(
+                    x=df_pareto[col_prob], y=df_pareto['quantidade'],
+                    name='Ocorrencias', marker_color='#EF4444'
+                ))
+                fig_par.add_trace(go.Scatter(
+                    x=df_pareto[col_prob], y=df_pareto['perc_acumulado'],
+                    name='% Acumulado', yaxis='y2',
+                    mode='lines+markers', line=dict(color='white', width=2)
+                ))
+                
+                fig_par.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white",
+                    xaxis_title="Causa Raiz", yaxis_title="Frequencia",
+                    yaxis2=dict(title="Acumulado (%)", overlaying='y', side='right', range=[0, 110], showgrid=False),
+                    height=450,
+                    legend=dict(orientation="h", y=1.1, x=0)
+                )
+                st.plotly_chart(fig_par, use_container_width=True)
+                
+                st.markdown("##### Detalhamento")
+                st.dataframe(df_pareto, use_container_width=True, hide_index=True)
+            else:
+                st.error("Coluna de descrição do problema não encontrada.")
         else:
             st.info("Nenhum problema registrado no periodo.")
