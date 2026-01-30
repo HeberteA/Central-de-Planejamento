@@ -17,26 +17,36 @@ def get_month_name(dt):
         5: 'MAIO', 6: 'JUNHO', 7: 'JULHO', 8: 'AGOSTO',
         9: 'SETEMBRO', 10: 'OUTUBRO', 11: 'NOVEMBRO', 12: 'DEZEMBRO'
     }
-    return f"{meses[dt.month]} {dt.year}"
+    return f"{meses[dt.month]}"
 
 def get_week_label(dt):
     if not dt: return ""
     semana = dt.isocalendar()[1]
-    return f"SEMANA {semana} ({dt.year})"
+    return f"SEMANA {semana}"
 
-def render_kpi_cards(df):
-    total_pendente = len(df[df['status'] == 'Pendente'])
-    total_resolvido = len(df[df['status'] == 'Removida'])
+def render_kpi_cards(df, start_week, end_week):
+    current_month = start_week.month
+    current_year = start_week.year
     
-    hoje = datetime.now()
-    mes_atual_str = get_month_name(hoje)
+    count_pendente = len(df[df['status'] == 'Pendente'])
     
-    pendencias_mes = 0
-    for _, row in df.iterrows():
-        dt = safe_date(row['data_identificacao'])
-        if row['status'] == 'Pendente' and dt:
-            if get_month_name(dt) == mes_atual_str:
-                pendencias_mes += 1
+    df_removidas_mes = df[
+        (df['status'] == 'Removida') & 
+        (df['data_resolucao'].apply(lambda x: safe_date(x).month if safe_date(x) else 0) == current_month) &
+        (df['data_resolucao'].apply(lambda x: safe_date(x).year if safe_date(x) else 0) == current_year)
+    ]
+    count_resolvidas_mes = len(df_removidas_mes)
+    
+    total_mes = count_pendente + count_resolvidas_mes
+    
+    df_removidas_semana = df[
+        (df['status'] == 'Removida') & 
+        (df['data_resolucao'] >= start_week.strftime('%Y-%m-%d')) & 
+        (df['data_resolucao'] <= end_week.strftime('%Y-%m-%d'))
+    ]
+    count_resolvidas_semana = len(df_removidas_semana)
+    
+    irr = (count_resolvidas_semana / total_mes * 100) if total_mes > 0 else 0
 
     st.markdown("""
     <style>
@@ -60,10 +70,9 @@ def render_kpi_cards(df):
         .kpi-info { display: flex; flex-direction: column; }
         .kpi-val { font-size: 1.8rem; font-weight: bold; color: white; }
         .kpi-lbl { font-size: 0.75rem; color: #aaa; text-transform: uppercase; font-weight: 600; }
-        .kpi-icon { font-size: 1.5rem; opacity: 0.5; }
         .kb-red { border-left: 4px solid #EF4444; }
-        .kb-yellow { border-left: 4px solid #E37026; }
         .kb-green { border-left: 4px solid #10B981; }
+        .kb-blue { border-left: 4px solid #3B82F6; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -71,25 +80,26 @@ def render_kpi_cards(df):
     <div class="kpi-row">
         <div class="kpi-box kb-red">
             <div class="kpi-info">
-                <span class="kpi-val">{total_pendente}</span>
-                <span class="kpi-lbl">Total Pendente</span>
-            </div>
-        </div>
-        <div class="kpi-box kb-yellow">
-            <div class="kpi-info">
-                <span class="kpi-val">{pendencias_mes}</span>
-                <span class="kpi-lbl">Novas este Mes</span>
+                <span class="kpi-val">{total_mes}</span>
+                <span class="kpi-lbl">Total Restrições (Mês)</span>
             </div>
         </div>
         <div class="kpi-box kb-green">
             <div class="kpi-info">
-                <span class="kpi-val">{total_resolvido}</span>
-                <span class="kpi-lbl">Total Resolvido</span>
+                <span class="kpi-val">{count_resolvidas_semana}</span>
+                <span class="kpi-lbl">Removidas na Semana</span>
+            </div>
+        </div>
+        <div class="kpi-box kb-blue">
+            <div class="kpi-info">
+                <span class="kpi-val">{irr:.1f}%</span>
+                <span class="kpi-lbl">IRR</span>
             </div>
         </div>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
+    return total_mes, count_resolvidas_semana, irr
 
 def render_boards(df, supabase):
     st.markdown("""
@@ -151,13 +161,14 @@ def render_boards(df, supabase):
     col_pend, col_res = st.columns(2)
 
     with col_pend:
-        st.markdown('<div class="section-title">PENDÊNCIAS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="col-wrapper">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">RESTRIÇÕES (POR MÊS)</div>', unsafe_allow_html=True)
         
         df_pend = df[df['status'] == 'Pendente'].copy()
         if df_pend.empty:
             st.info("Nenhuma pendência ativa.")
         else:
-            df_pend['mes_grupo'] = df_pend['data_identificacao'].apply(lambda x: get_month_name(safe_date(x)))
+            df_pend['mes_grupo'] = df_pend['data_identificacao'].apply(lambda x: f"{get_month_name(safe_date(x))} {safe_date(x).year}" if safe_date(x) else "S/D")
             df_pend['data_dt'] = df_pend['data_identificacao'].apply(safe_date)
             df_pend = df_pend.sort_values('data_dt')
             
@@ -199,13 +210,14 @@ def render_boards(df, supabase):
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_res:
-        st.markdown('<div class="section-title">REMOVIDAS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="col-wrapper">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">REMOVIDAS (POR SEMANA)</div>', unsafe_allow_html=True)
         
         df_res = df[df['status'] == 'Removida'].copy()
         if df_res.empty:
             st.info("Nenhuma restrição removida ainda.")
         else:
-            df_res['sem_grupo'] = df_res['data_resolucao'].apply(lambda x: get_week_label(safe_date(x)))
+            df_res['sem_grupo'] = df_res['data_resolucao'].apply(lambda x: f"{get_week_label(safe_date(x))} ({safe_date(x).year})" if safe_date(x) else "S/D")
             df_res['data_res_dt'] = df_res['data_resolucao'].apply(safe_date)
             df_res = df_res.sort_values('data_res_dt', ascending=False)
             
@@ -234,7 +246,7 @@ def render_boards(df, supabase):
         st.markdown('</div>', unsafe_allow_html=True)
 
 def render_management(supabase, obra_id):
-    st.markdown("##### Gerenciar Restrições")
+    st.markdown("##### Gerenciar Tudo")
     
     query = supabase.table("pcp_restricoes").select("*").eq("obra_id", obra_id).order("id")
     response = query.execute()
@@ -275,16 +287,30 @@ def render_management(supabase, obra_id):
                 st.rerun()
 
 def app(obra_id):
-    st.markdown("# Restrições")
+    st.markdown("### Quadro de Restrições")
     
     supabase = database.get_db_client()
     user = st.session_state.get('user', {})
     is_admin = user.get('role') == 'admin'
+
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        data_ref = st.date_input("Semana de Referencia", datetime.now())
+        start_week = data_ref - timedelta(days=data_ref.weekday())
+        end_week = start_week + timedelta(days=4)
+    with c2:
+        st.markdown("")
+        st.info(f"Periodo: {start_week.strftime('%d/%m/%Y')} a {end_week.strftime('%d/%m/%Y')}")
     
+    total_mes_val = 0
+    removidas_sem_val = 0
+    irr_val = 0
+
     try:
         resp = supabase.table("pcp_restricoes").select("*").eq("obra_id", obra_id).execute()
         df_all = pd.DataFrame(resp.data) if resp.data else pd.DataFrame(columns=['status', 'data_identificacao', 'data_resolucao'])
-        render_kpi_cards(df_all)
+        
+        total_mes_val, removidas_sem_val, irr_val = render_kpi_cards(df_all, start_week, end_week)
     except:
         df_all = pd.DataFrame()
 
@@ -333,3 +359,32 @@ def app(obra_id):
     if is_admin and len(tabs) > 1:
         with tabs[1]:
             render_management(supabase, obra_id)
+
+    st.markdown("---")
+    with st.expander("Finalizar Semana"):
+        st.warning("Isso salvará o histórico de restrições para o Dashboard.")
+        if st.button("Confirmar Fechamento", type="primary"):
+            try:
+                
+                mes_nome = get_month_name(start_week)
+                ano_val = start_week.year
+                semana_label = get_week_label(start_week) 
+                supabase.table("pcp_historico_irr").delete().eq("obra_id", obra_id).eq("data_referencia", start_week.strftime('%Y-%m-%d')).execute()
+                
+                dados_irr = {
+                    "obra_id": obra_id,
+                    "mes": mes_nome,
+                    "ano": ano_val,
+                    "semana_ref": semana_label,
+                    "restricoes_totais": total_mes_val,
+                    "restricoes_removidas": removidas_sem_val,
+                    "irr_percentual": irr_val,
+                    "data_referencia": start_week.strftime('%Y-%m-%d'),
+                    "meta_percentual": 80.0
+                }
+                
+                supabase.table("pcp_historico_irr").insert(dados_irr).execute()
+                st.success("Dados salvos no histórico!")
+                st.balloons()
+            except Exception as e:
+                st.error(f"Erro ao salvar: {e}")
