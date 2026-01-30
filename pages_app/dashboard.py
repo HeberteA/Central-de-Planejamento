@@ -162,7 +162,7 @@ def app(obra_id_param):
                 title="Evolucao Semanal",
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 font_color="white", xaxis_title="Semana", yaxis_title="Percentual",
-                legend=dict(orientation="h", y=1.1, x=0), height=450,
+                legend=dict(orientation="h", y=1.1, x=1.1), height=450,
                 margin=dict(l=20, r=20, t=40, b=20)
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -173,7 +173,7 @@ def app(obra_id_param):
         c_res1, c_res2 = st.columns(2)
         
         with c_res1:
-            st.markdown("##### Identificadas vs Removidas")
+            st.markdown("##### Restrições vs Removidas")
             if not df_irr.empty:
                 df_irr = df_irr.sort_values('data')
                 
@@ -181,7 +181,7 @@ def app(obra_id_param):
                 
                 fig_bal.add_trace(go.Bar(
                     x=df_irr['data'], y=df_irr['restricoes_totais'],
-                    name='Total Estoque', marker_color='#EF4444',
+                    name='Restrições', marker_color='#EF4444',
                     text=df_irr['restricoes_totais'], textposition='auto'
                 ))
                 fig_bal.add_trace(go.Bar(
@@ -201,7 +201,7 @@ def app(obra_id_param):
                 st.info("Sem dados de restricoes historicas.")
 
         with c_res2:
-            st.markdown("##### Status Atual (Snapshot)")
+            st.markdown("##### Status Atual")
             if not df_rest_atuais.empty:
                 df_rest_atuais['area'] = df_rest_atuais['area'].fillna('GERAL')
                 df_pizza = df_rest_atuais['area'].value_counts().reset_index()
