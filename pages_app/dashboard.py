@@ -88,4 +88,154 @@ def app(obra_id):
                 fig.add_trace(go.Scatter(
                     x=df_ind['data_inicio_semana'], y=df_ind['pap'],
                     mode='lines+markers', name='PAP (Diario)',
-                    line=dict
+                    line=dict(color='#4ADE80', width=3, dash='dot')
+                ))
+                fig.add_hline(y=80, line_dash="dash", line_color="white", annotation_text="Meta 80%")
+                
+                fig.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white", xaxis_title="Semana", yaxis_title="Percentual",
+                    legend=dict(orientation="h", y=1.1, x=0), height=350,
+                    margin=dict(l=20, r=20, t=20, b=20)
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Sem dados de producao no periodo.")
+
+        with g2:
+            st.markdown("##### Volume de Atividades")
+            if not df_ind.empty and 'atividades_concluidas' in df_ind.columns:
+                df_ind['total_estimado'] = df_ind.apply(lambda row: int(row['atividades_concluidas'] / (row['ppc']/100)) if row['ppc'] > 0 else 0, axis=1)
+                
+                fig_vol = go.Figure()
+                fig_vol.add_trace(go.Bar(
+                    x=df_ind['data_inicio_semana'], y=df_ind['total_estimado'],
+                    name='Programado', marker_color='#333333'
+                ))
+                fig_vol.add_trace(go.Bar(
+                    x=df_ind['data_inicio_semana'], y=df_ind['atividades_concluidas'],
+                    name='Concluido', marker_color='#3B82F6'
+                ))
+                fig_vol.update_layout(
+                    barmode='overlay',
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white", xaxis_title="Semana", yaxis_title="Qtd Atividades",
+                    legend=dict(orientation="h", y=1.1, x=0), height=350,
+                    margin=dict(l=20, r=20, t=20, b=20)
+                )
+                st.plotly_chart(fig_vol, use_container_width=True)
+            else:
+                st.info("Sem dados suficientes.")
+
+    with t2:
+        r1, r2 = st.columns(2)
+        
+        with r1:
+            st.markdown("##### Evolucao IRR")
+            if not df_irr.empty:
+                df_irr = df_irr.sort_values('data_referencia')
+                fig_irr = go.Figure()
+                fig_irr.add_trace(go.Scatter(
+                    x=df_irr['data_referencia'], y=df_irr['irr_percentual'],
+                    mode='lines+markers+text', text=df_irr['irr_percentual'].apply(lambda x: f"{x:.0f}%"),
+                    textposition="top center",
+                    name='IRR', line=dict(color='#E37026', width=3)
+                ))
+                fig_irr.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white", xaxis_title="Semana", yaxis_title="IRR (%)",
+                    height=350, margin=dict(l=20, r=20, t=20, b=20)
+                )
+                st.plotly_chart(fig_irr, use_container_width=True)
+            else:
+                st.info("Sem dados de IRR.")
+
+        with r2:
+            st.markdown("##### Balanco: Identificadas vs Removidas")
+            if not df_irr.empty:
+                fig_bal = go.Figure()
+                fig_bal.add_trace(go.Bar(
+                    x=df_irr['data_referencia'], y=df_irr['restricoes_totais'],
+                    name='Total Estoque', marker_color='#EF4444'
+                ))
+                fig_bal.add_trace(go.Bar(
+                    x=df_irr['data_referencia'], y=df_irr['restricoes_removidas'],
+                    name='Removidas', marker_color='#10B981'
+                ))
+                fig_bal.update_layout(
+                    barmode='group',
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white", xaxis_title="Semana", yaxis_title="Quantidade",
+                    legend=dict(orientation="h", y=1.1, x=0), height=350
+                )
+                st.plotly_chart(fig_bal, use_container_width=True)
+            else:
+                st.info("Sem dados.")
+
+        st.markdown("---")
+        st.markdown("##### Restricoes Pendentes (Snapshot Atual)")
+        
+        rp1, rp2 = st.columns(2)
+        
+        with rp1:
+            if not df_rest_atuais.empty:
+                df_rest_atuais['area'] = df_rest_atuais['area'].fillna('GERAL')
+                df_pizza = df_rest_atuais['area'].value_counts().reset_index()
+                df_pizza.columns = ['area', 'count']
+                
+                fig_pie = px.pie(df_pizza, values='count', names='area', title='Por Area', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+                fig_pie.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white", height=300
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                st.info("Nenhuma pendencia.")
+        
+        with rp2:
+            if not df_rest_atuais.empty:
+                df_prio = df_rest_atuais['prioridade'].value_counts().reset_index()
+                df_prio.columns = ['prioridade', 'count']
+                
+                fig_bar_p = px.bar(df_prio, x='prioridade', y='count', title='Por Prioridade', color='prioridade', 
+                                   color_discrete_map={'Alta': '#EF4444', 'Media': '#F59E0B', 'Baixa': '#3B82F6'})
+                fig_bar_p.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white", height=300
+                )
+                st.plotly_chart(fig_bar_p, use_container_width=True)
+
+    with t3:
+        st.markdown("##### Analise de Causas Raiz (Pareto)")
+        if not df_prob.empty:
+            df_pareto = df_prob.groupby('problema')['quantidade'].sum().reset_index()
+            df_pareto = df_pareto.sort_values('quantidade', ascending=False)
+            
+            df_pareto['acumulado'] = df_pareto['quantidade'].cumsum()
+            df_pareto['perc_acumulado'] = (df_pareto['acumulado'] / df_pareto['quantidade'].sum()) * 100
+            
+            fig_par = go.Figure()
+            fig_par.add_trace(go.Bar(
+                x=df_pareto['problema'], y=df_pareto['quantidade'],
+                name='Ocorrencias', marker_color='#EF4444'
+            ))
+            fig_par.add_trace(go.Scatter(
+                x=df_pareto['problema'], y=df_pareto['perc_acumulado'],
+                name='% Acumulado', yaxis='y2',
+                mode='lines+markers', line=dict(color='white', width=2)
+            ))
+            
+            fig_par.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                font_color="white",
+                xaxis_title="Causa Raiz", yaxis_title="Frequencia",
+                yaxis2=dict(title="Acumulado (%)", overlaying='y', side='right', range=[0, 110], showgrid=False),
+                height=450,
+                legend=dict(orientation="h", y=1.1, x=0)
+            )
+            st.plotly_chart(fig_par, use_container_width=True)
+            
+            st.markdown("##### Detalhamento")
+            st.dataframe(df_pareto, use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhum problema registrado no periodo.")
