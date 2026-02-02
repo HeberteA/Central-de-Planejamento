@@ -107,51 +107,51 @@ def login_screen():
         </div>
         """, unsafe_allow_html=True)
             
-            tab_obra, tab_admin = st.tabs(["EQUIPE DE OBRA", "ADMINISTRADOR"])
+        tab_obra, tab_admin = st.tabs(["EQUIPE DE OBRA", "ADMINISTRADOR"])
             
-            with tab_obra:
-                st.markdown("<br>", unsafe_allow_html=True)
-                obras_list = []
-                obras_map = {}
-                try:
-                    r = supabase.table("pcp_obras").select("id, nome").execute()
-                    for item in r.data:
-                        obras_list.append(item['nome'])
-                        obras_map[item['nome']] = item['id']
-                except: pass
+        with tab_obra:
+            st.markdown("<br>", unsafe_allow_html=True)
+            obras_list = []
+            obras_map = {}
+            try:
+                r = supabase.table("pcp_obras").select("id, nome").execute()
+                for item in r.data:
+                    obras_list.append(item['nome'])
+                    obras_map[item['nome']] = item['id']
+            except: pass
                 
-                sel_obra = st.selectbox("Selecione a Obra", obras_list)
-                senha_obra = st.text_input("Senha da Obra", type="password", key="pwd_obra")
+            sel_obra = st.selectbox("Selecione a Obra", obras_list)
+            senha_obra = st.text_input("Senha da Obra", type="password", key="pwd_obra")
                 
-                if st.button("Acessar Obra", use_container_width=True):
+            if st.button("Acessar Obra", use_container_width=True):
                     
-                    res = supabase.table("pcp_obras").select("*").eq("id", obras_map.get(sel_obra)).eq("senha_acesso", senha_obra).execute()
-                    if res.data:
-                        res_user = supabase.table("pcp_users").select("*").neq("role", "admin").limit(1).execute()
-                        if res_user.data:
-                            st.session_state['user'] = res_user.data[0] 
-                            st.session_state['obra_ativa_id'] = obras_map[sel_obra]
-                            st.rerun()
-                    else:
-                        st.error("Senha incorreta.")
-
-            with tab_admin:
-                st.markdown("<br>", unsafe_allow_html=True)
-                senha_admin = st.text_input("Senha", type="password", key="pwd_admin")
-                
-                if st.button("Acessar Como Admin", use_container_width=True):
-                    
-                    res = supabase.table("pcp_users").select("*").eq("password", senha_admin).eq("role", "admin").execute()
-                    if res.data:
-                        user_data = res.data[0]
-                        st.session_state['user'] = user_data
-                        
-                        obras_res = supabase.table("pcp_obras").select("*").execute()
-                        if obras_res.data:
-                            st.session_state['obra_ativa_id'] = obras_res.data[0]['id']
+                res = supabase.table("pcp_obras").select("*").eq("id", obras_map.get(sel_obra)).eq("senha_acesso", senha_obra).execute()
+                if res.data:
+                    res_user = supabase.table("pcp_users").select("*").neq("role", "admin").limit(1).execute()
+                    if res_user.data:
+                        st.session_state['user'] = res_user.data[0] 
+                        st.session_state['obra_ativa_id'] = obras_map[sel_obra]
                         st.rerun()
-                    else:
-                        st.error("Senha de administrador invalida.")
+                else:
+                    st.error("Senha incorreta.")
+
+        with tab_admin:
+            st.markdown("<br>", unsafe_allow_html=True)
+            senha_admin = st.text_input("Senha", type="password", key="pwd_admin")
+                
+            if st.button("Acessar Como Admin", use_container_width=True):
+                    
+                res = supabase.table("pcp_users").select("*").eq("password", senha_admin).eq("role", "admin").execute()
+                if res.data:
+                    user_data = res.data[0]
+                    st.session_state['user'] = user_data
+                        
+                    obras_res = supabase.table("pcp_obras").select("*").execute()
+                    if obras_res.data:
+                        st.session_state['obra_ativa_id'] = obras_res.data[0]['id']
+                    st.rerun()
+                else:
+                    st.error("Senha de administrador invalida.")
                     
 
 def logout():
