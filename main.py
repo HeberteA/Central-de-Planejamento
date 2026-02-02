@@ -133,7 +133,6 @@ def login_screen():
                     st.error("Senha incorreta.")
 
         with tab_admin:
-            st.markdown("<br>", unsafe_allow_html=True)
             senha_admin = st.text_input("Senha", type="password", key="pwd_admin")
                 
             if st.button("Acessar Como Admin", use_container_width=True):
