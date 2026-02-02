@@ -28,10 +28,9 @@ st.markdown("""
             max-width: 200px;
             margin-bottom: 20px;
         }
-        h2 {
-            text-align: center;
-            margin-bottom: 30px;
-        }
+        
+        h1, h2, h3 { color: #ffffff !important; font-weight: 600; letter-spacing: -0.5px; }
+        
         .login-container {
             background-color: transparent; 
             background-image: linear-gradient(160deg, #1e1e1f 0%, #0a0a0c 100%);
@@ -103,14 +102,13 @@ def login_screen():
         st.markdown(f"""
         <div class="login-container">
             {header_html}
-            <h2 style='color:#ffffff; font-size: 2.2rem; margin-top: 10px; margin-bottom: 0px;'>CENTRAL DE PLANEJAMENTO</h2>
+            <h2 style='color:#ffffff; font-size: 2.5rem; margin-top: 10px; margin-bottom: 0px;'>CENTRAL DE PLANEJAMENTO</h2>
         </div>
         """, unsafe_allow_html=True)
             
         tab_obra, tab_admin = st.tabs(["EQUIPE DE OBRA", "ADMINISTRADOR"])
             
         with tab_obra:
-            st.markdown("<br>", unsafe_allow_html=True)
             obras_list = []
             obras_map = {}
             try:
