@@ -243,11 +243,16 @@ else:
             menu_icon="cast",
             default_index=0,
             styles={
-                "container": {"padding": "5!important", "background-color": "rgba(227, 112, 38, 0.15)"},
-                "icon": {"color": "#FFFFFF", "font-size": "16px"}, 
-                "nav-link": {"font-size": "14px", "text-align": "left", "--hover-color": "#333"},
-                "nav-link-selected": {"background-color": "#E37026"},
+                "container": {"padding": "0!important", "background": "transparent"},
+                "nav-link": {"color": "#aaa", "font-size": "0.9rem", "margin":"6px", "text-align": "left"},
+                "nav-link-selected": {
+                    "background-color": "rgba(227, 112, 38, 0.15)", 
+                    "color": "#E37026", 
+                    "border-left": "3px solid #E37026"
+                },
+                "icon": {"font-size": "1.1rem"}
             }
+
         )
         
         st.markdown("---")
