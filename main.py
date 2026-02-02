@@ -4,6 +4,9 @@ from PIL import Image
 from modules import database
 from modules import ui
 import time
+import os
+import base64
+
 
 st.set_page_config(
     page_title="Centro de Planejamento",
@@ -28,6 +31,15 @@ st.markdown("""
         h2 {
             text-align: center;
             margin-bottom: 30px;
+        }
+        .login-container {
+            background-color: transparent; 
+            background-image: linear-gradient(160deg, #1e1e1f 0%, #0a0a0c 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 10px;
         }
         .sidebar-logo-container {
             text-align: center;
@@ -65,6 +77,12 @@ def get_obra_config(supabase, obra_id):
     except: pass
     return {"usa_lob": True, "usa_pull": True}
 
+def get_base64_image(image_path):
+    if not os.path.exists(image_path):
+        return None
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
 def login_screen():
     supabase = database.get_db_client()
     
@@ -73,19 +91,21 @@ def login_screen():
     with c_out2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        with st.container(border=True):
-            C1, C2, C3 = st.columns([1,5,1])
-            with C2:
-                try:
-                    st.image("assets/logo.png", use_container_width=True)
-                except:
-                    st.markdown("## Centro de Planejamento")
+        logo_file = "assets/logo.png" if os.path.exists("assets/logo.png") else "Lavie.jpg"
+        img_b64 = get_base64_image(logo_file)
+        
+        if img_b64:
+            mime_type = "image/png" if logo_file.endswith(".png") else "image/jpeg"
+            header_html = f'<img src="data:{mime_type};base64,{img_b64}" style="width: 650px; height: auto; display: block; margin: 0 auto 20px auto;">'
+        else:
+            header_html = "<h2 style='color:#E37026; margin-bottom: 10px;'>LAVIE</h2>"
 
-            st.markdown(f"""
-            <div class="login-container">
-                <h2 style='color:#FFFFFF; font-size: 2.7rem; margin-top: 10px; margin-bottom: 0px;'>CENTRO DE PLANEJAMENTO</h2>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="login-container">
+            {header_html}
+            <h2 style='color:#E37026; font-size: 2.7rem; margin-top: 10px; margin-bottom: 0px;'>CENTRAL DE PLANEJAMENTO</h2>
+        </div>
+        """, unsafe_allow_html=True)
             
             tab_obra, tab_admin = st.tabs(["EQUIPE DE OBRA", "ADMINISTRADOR"])
             
