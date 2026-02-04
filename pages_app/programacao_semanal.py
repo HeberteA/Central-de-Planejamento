@@ -404,29 +404,44 @@ def app(obra_id):
         
         if st.button("Confirmar Fechamento", type="primary", use_container_width=True):
             try:
-                supabase.table("pcp_historico_indicadores").delete().eq("obra_id", obra_id).eq("data_inicio_semana", start_week.strftime('%Y-%m-%d')).execute()
+                start_week_str = start_week.strftime('%Y-%m-%d')
                 
-                dados_ind = {
-                    "obra_id": obra_id,
-                    "data_referencia": start_week.strftime('%Y-%m-%d'),
-                    "pap": pap_percent,
-                    "atividades_concluidas": total_concluidas,
-                    "ppc": ppc_percent,
-                    "data_fechamento": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-                supabase.table("pcp_historico_indicadores").insert(dados_ind).execute()
+                supabase.table("pcp_historico_indicadores").delete().eq("obra_id", obra_id).eq("data_referencia", start_week_str).execute()
+                supabase.table("pcp_historico_problemas").delete().eq("obra_id", obra_id).eq("data_referencia", start_week_str).execute()
 
-                supabase.table("pcp_historico_problemas").delete().eq("obra_id", obra_id).eq("data_inicio_semana", start_week.strftime('%Y-%m-%d')).execute()
+                supabase.table("pcp_historico_indicadores").insert({
+                    "obra_id": obra_id,
+                    "mes": get_month_name(start_week),
+                    "ano": start_week.year,
+                    "semana_ref": get_week_label(start_week),
+                    "tipo_indicador": "PPC",
+                    "valor_percentual": ppc_percent,
+                    "meta_percentual": 80.0,
+                    "data_referencia": start_week_str
+                }).execute()
                 
+                supabase.table("pcp_historico_indicadores").insert({
+                    "obra_id": obra_id,
+                    "mes": get_month_name(start_week),
+                    "ano": start_week.year,
+                    "semana_ref": get_week_label(start_week),
+                    "tipo_indicador": "PAP",
+                    "valor_percentual": pap_percent,
+                    "meta_percentual": 80.0,
+                    "data_referencia": start_week_str
+                }).execute()
+
                 causas_series = df[df['status'] == 'Nao Concluido']['causa'].value_counts()
                 for causa, qtd in causas_series.items():
                     if causa:
                         dados_prob = {
                             "obra_id": obra_id,
-                            "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
-                            "problema": causa,
+                            "mes": get_month_name(start_week),
+                            "ano": start_week.year,
+                            "semana_ref": get_week_label(start_week),
+                            "problema_descricao": causa,
                             "quantidade": int(qtd),
-                            "data_fechamento": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            "data_referencia": start_week_str
                         }
                         supabase.table("pcp_historico_problemas").insert(dados_prob).execute()
                 
