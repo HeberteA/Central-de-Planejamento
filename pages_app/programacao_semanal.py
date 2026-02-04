@@ -408,7 +408,7 @@ def app(obra_id):
                 
                 dados_ind = {
                     "obra_id": obra_id,
-                    "data_inicio_semana": start_week.strftime('%Y-%m-%d'),
+                    "data_referencia": start_week.strftime('%Y-%m-%d'),
                     "pap": pap_percent,
                     "atividades_concluidas": total_concluidas,
                     "ppc": ppc_percent,
