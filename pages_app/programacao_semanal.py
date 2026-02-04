@@ -398,7 +398,6 @@ def app(obra_id):
 
                     supabase.table("pcp_programacao_semanal").update(up_data).eq("id", row['id']).execute()
                     st.toast("Salvo!", icon="Success")
-                    time.sleep(1)
                     st.rerun()
 
             with c_btn2:
