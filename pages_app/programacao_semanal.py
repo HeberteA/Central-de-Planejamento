@@ -14,6 +14,18 @@ def update_record(id, field, value):
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
 
+def get_month_name(dt):
+    meses = {
+        1: 'JANEIRO', 2: 'FEVEREIRO', 3: 'MARÇO', 4: 'ABRIL',
+        5: 'MAIO', 6: 'JUNHO', 7: 'JULHO', 8: 'AGOSTO',
+        9: 'SETEMBRO', 10: 'OUTUBRO', 11: 'NOVEMBRO', 12: 'DEZEMBRO'
+    }
+    return f"{meses[dt.month]}"
+
+def get_week_label(dt):
+    semana = dt.isocalendar()[1]
+    return f"SEMANA {semana}"
+
 def app(obra_id):
     st.markdown("""
     <style>
@@ -404,48 +416,63 @@ def app(obra_id):
         
         if st.button("Confirmar Fechamento", type="primary", use_container_width=True):
             try:
-                start_week_str = start_week.strftime('%Y-%m-%d')
+                data_ref_str = start_week.strftime('%Y-%m-%d')
+                mes_nome = get_month_name(start_week)
+                ano_val = start_week.year
+                semana_lbl = get_week_label(start_week)
+
+                supabase.table("pcp_historico_indicadores").delete()\
+                    .eq("obra_id", obra_id).eq("data_referencia", data_ref_str).execute()
                 
-                supabase.table("pcp_historico_indicadores").delete().eq("obra_id", obra_id).eq("data_referencia", start_week_str).execute()
-                supabase.table("pcp_historico_problemas").delete().eq("obra_id", obra_id).eq("data_referencia", start_week_str).execute()
+                supabase.table("pcp_historico_problemas").delete()\
+                    .eq("obra_id", obra_id).eq("data_referencia", data_ref_str).execute()
 
                 supabase.table("pcp_historico_indicadores").insert({
                     "obra_id": obra_id,
-                    "mes": get_month_name(start_week),
-                    "ano": start_week.year,
-                    "semana_ref": get_week_label(start_week),
+                    "mes": mes_nome,
+                    "ano": ano_val,
+                    "semana_ref": semana_lbl,
                     "tipo_indicador": "PPC",
                     "valor_percentual": ppc_percent,
                     "meta_percentual": 80.0,
-                    "data_referencia": start_week_str
+                    "data_referencia": data_ref_str
                 }).execute()
                 
+                # 3. Insere PAP (Outra linha específica)
                 supabase.table("pcp_historico_indicadores").insert({
                     "obra_id": obra_id,
-                    "mes": get_month_name(start_week),
-                    "ano": start_week.year,
-                    "semana_ref": get_week_label(start_week),
+                    "mes": mes_nome,
+                    "ano": ano_val,
+                    "semana_ref": semana_lbl,
                     "tipo_indicador": "PAP",
                     "valor_percentual": pap_percent,
                     "meta_percentual": 80.0,
-                    "data_referencia": start_week_str
+                    "data_referencia": data_ref_str
                 }).execute()
 
                 causas_series = df[df['status'] == 'Nao Concluido']['causa'].value_counts()
-                for causa, qtd in causas_series.items():
-                    if causa:
-                        dados_prob = {
-                            "obra_id": obra_id,
-                            "mes": get_month_name(start_week),
-                            "ano": start_week.year,
-                            "semana_ref": get_week_label(start_week),
-                            "problema_descricao": causa,
-                            "quantidade": int(qtd),
-                            "data_referencia": start_week_str
-                        }
-                        supabase.table("pcp_historico_problemas").insert(dados_prob).execute()
+                
+                if not causas_series.empty:
+                    lista_problemas_insert = []
+                    for causa, qtd in causas_series.items():
+                        if causa:
+                            lista_problemas_insert.append({
+                                "obra_id": obra_id,
+                                "mes": mes_nome,
+                                "ano": ano_val,
+                                "semana_ref": semana_lbl,
+                                "problema_descricao": causa,  
+                                "quantidade": int(qtd),
+                                "data_referencia": data_ref_str
+                            })
+                    
+                    if lista_problemas_insert:
+                        supabase.table("pcp_historico_problemas").insert(lista_problemas_insert).execute()
                 
                 st.success("Semana finalizada com sucesso!")
                 st.balloons()
+                time.sleep(1)
+                st.rerun()
+
             except Exception as e:
                 st.error(f"Erro ao finalizar: {e}")
