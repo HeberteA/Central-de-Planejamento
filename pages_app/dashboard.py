@@ -28,7 +28,6 @@ def load_data(supabase, obra_id, start_date, end_date):
             df_ind['data_ref'] = pd.to_datetime(df_ind['data_referencia'])
             
             if 'tipo_indicador' in df_ind.columns:
-                # Agrupa por data e semana_ref para preservar o nome da semana
                 cols_index = ['data_ref']
                 if 'semana_ref' in df_ind.columns:
                     cols_index.append('semana_ref')
@@ -58,7 +57,6 @@ def load_data(supabase, obra_id, start_date, end_date):
     if not df_irr.empty:
         df_irr['data'] = pd.to_datetime(df_irr['data_referencia'])
         if obra_id is None:
-            # Se for todas as obras, recalcula a media ponderada
             df_irr = df_irr.groupby('data').agg({
                 'restricoes_totais': 'sum',
                 'restricoes_removidas': 'sum'
@@ -151,7 +149,6 @@ def app(obra_id_param):
         if not df_ind.empty:
             df_ind = df_ind.sort_values('data')
             
-            # Define eixo X: usa semana_ref se existir, senao data
             eixo_x = 'semana_ref' if 'semana_ref' in df_ind.columns else 'data'
             
             st.markdown("##### Desempenho Semanal")
@@ -184,7 +181,7 @@ def app(obra_id_param):
             st.markdown("---")
             st.markdown("##### Desempenho Mensal (Consolidado)")
             
-            df_ind_m = df_ind.set_index('data').resample('ME').mean().reset_index()
+            df_ind_m = df_ind.set_index('data')[['ppc', 'pap']].resample('ME').mean().reset_index()
             df_ind_m['mes_ano'] = df_ind_m['data'].dt.strftime('%m/%Y')
             
             fig_m = go.Figure()
