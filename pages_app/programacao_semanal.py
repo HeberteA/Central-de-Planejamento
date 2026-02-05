@@ -403,7 +403,7 @@ def app(obra_id):
     st.markdown("##### Fechamento da Semana")
     
     with st.expander("Finalizar Semana"):
-        st.warning("Ao finalizar, os indicadores desta semana serao salvos no historico.")
+        st.info("Ao finalizar, os indicadores desta semana serao salvos no historico.")
         
         if st.button("Confirmar Fechamento", type="primary", use_container_width=True):
             try:
