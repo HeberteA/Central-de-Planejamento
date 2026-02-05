@@ -90,6 +90,9 @@ def app(obra_id_param):
     user = st.session_state.get('user', {})
     is_admin = user.get('role') == 'admin'
 
+    lavie_orange = '#E37026'
+    lavie_palette = [lavie_orange, '#333333', '#666666', '#999999', '#CCCCCC']
+
     obra_id = obra_id_param
     if is_admin:
         try:
@@ -114,7 +117,7 @@ def app(obra_id_param):
     with col_f1:
         d_end = datetime.now()
         d_start = d_end - timedelta(days=120)
-        dates = st.date_input("Periodo Global (Tendencia)", [d_start, d_end])
+        dates = st.date_input("Periodo Global", [d_start, d_end])
         
         if len(dates) == 2:
             s_date, e_date = dates
@@ -157,8 +160,6 @@ def app(obra_id_param):
         if not df_ind.empty:
             df_ind_m = df_ind.groupby('mes_ano_label')[['ppc', 'pap']].mean().reset_index()
             
-            # Ordena meses cronologicamente recuperando a data original
-            # Truque: pega o primeiro registro de cada mes/ano no df original para ordenar
             df_order = df_ind[['mes_ano_label', 'data']].sort_values('data').drop_duplicates('mes_ano_label')
             df_ind_m = df_ind_m.merge(df_order[['mes_ano_label']], on='mes_ano_label')
             
@@ -167,12 +168,12 @@ def app(obra_id_param):
                 x=df_ind_m['mes_ano_label'], y=df_ind_m['ppc'],
                 mode='lines+markers+text', name='PPC Mensal',
                 text=df_ind_m['ppc'].apply(lambda x: f"{x:.0f}%"), textposition='top center',
-                line=dict(color='#3B82F6', width=3)
+                line=dict(color=lavie_orange, width=3)
             ))
             fig_trend.add_trace(go.Scatter(
                 x=df_ind_m['mes_ano_label'], y=df_ind_m['pap'],
                 mode='lines+markers', name='PAP Mensal',
-                line=dict(color='#4ADE80', width=3, dash='dot')
+                line=dict(color='#888', width=3, dash='dot')
             ))
             
             fig_trend.update_layout(
@@ -186,11 +187,10 @@ def app(obra_id_param):
             st.markdown("##### Detalhamento Semanal (Filtro por Mes)")
             
             meses_disponiveis = df_ind['mes_ano_label'].unique().tolist()
-            # Ordena meses unicos pela data
             meses_sorted = sorted(meses_disponiveis, key=lambda x: datetime.strptime(x, "%m/%Y"))
             
             col_sel, col_vazio = st.columns([1, 3])
-            mes_selecionado = col_sel.selectbox("Selecione o Mes para Analise Semanal:", meses_sorted, index=len(meses_sorted)-1)
+            mes_selecionado = col_sel.selectbox("Selecione o Mes:", meses_sorted, index=len(meses_sorted)-1)
             
             df_mes = df_ind[df_ind['mes_ano_label'] == mes_selecionado].copy()
             df_mes = df_mes.sort_values('semana_ref')
@@ -206,7 +206,7 @@ def app(obra_id_param):
                     color="obra_nome", 
                     barmode="group",
                     text_auto='.0f',
-                    color_discrete_sequence=px.colors.qualitative.Plotly
+                    color_discrete_sequence=lavie_palette
                 )
                 fig_ppc.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
@@ -226,7 +226,7 @@ def app(obra_id_param):
                     color="obra_nome", 
                     barmode="group",
                     text_auto='.0f',
-                    color_discrete_sequence=px.colors.qualitative.Safe
+                    color_discrete_sequence=[lavie_orange, '#555555'] 
                 )
                 fig_pap.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
@@ -244,43 +244,26 @@ def app(obra_id_param):
         if not df_irr.empty:
             df_irr = df_irr.sort_values('data')
             
-            st.markdown("##### Fluxo Semanal")
-            c_res1, c_res2 = st.columns([2, 1])
+            st.markdown("##### Fluxo Semanal (Estoque vs Removidas)")
             
-            with c_res1:
-                fig_bal = go.Figure()
-                fig_bal.add_trace(go.Bar(
-                    x=df_irr['data'], y=df_irr['restricoes_totais'],
-                    name='Estoque', marker_color='#EF4444',
-                    text=df_irr['restricoes_totais'], textposition='auto'
-                ))
-                fig_bal.add_trace(go.Bar(
-                    x=df_irr['data'], y=df_irr['restricoes_removidas'],
-                    name='Removidas', marker_color='#10B981',
-                    text=df_irr['restricoes_removidas'], textposition='auto'
-                ))
-                fig_bal.update_layout(
-                    barmode='group',
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    font_color="white", xaxis_title="Semana", yaxis_title="Qtd",
-                    legend=dict(orientation="h", y=1.1, x=0), height=350
-                )
-                st.plotly_chart(fig_bal, use_container_width=True)
-
-            with c_res2:
-                fig_irr_line = go.Figure()
-                fig_irr_line.add_trace(go.Scatter(
-                    x=df_irr['data'], y=df_irr['irr_percentual'],
-                    mode='lines+markers+text', name='IRR %',
-                    text=df_irr['irr_percentual'].apply(lambda x: f"{x:.0f}%"), textposition='top center',
-                    line=dict(color='#E37026', width=3)
-                ))
-                fig_irr_line.update_layout(
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    font_color="white", xaxis_title="Semana", yaxis_title="IRR %",
-                    showlegend=False, height=350
-                )
-                st.plotly_chart(fig_irr_line, use_container_width=True)
+            fig_bal = go.Figure()
+            fig_bal.add_trace(go.Bar(
+                x=df_irr['data'], y=df_irr['restricoes_totais'],
+                name='Estoque Total', marker_color='#333333',
+                text=df_irr['restricoes_totais'], textposition='auto'
+            ))
+            fig_bal.add_trace(go.Bar(
+                x=df_irr['data'], y=df_irr['restricoes_removidas'],
+                name='Removidas', marker_color=lavie_orange,
+                text=df_irr['restricoes_removidas'], textposition='auto'
+            ))
+            fig_bal.update_layout(
+                barmode='group',
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                font_color="white", xaxis_title="Semana", yaxis_title="Qtd",
+                legend=dict(orientation="h", y=1.1, x=0), height=350
+            )
+            st.plotly_chart(fig_bal, use_container_width=True)
 
             st.markdown("---")
             st.markdown("##### Visao Mensal (Acumulado)")
@@ -294,12 +277,12 @@ def app(obra_id_param):
             fig_bal_m = go.Figure()
             fig_bal_m.add_trace(go.Bar(
                 x=df_irr_m['mes_ano'], y=df_irr_m['restricoes_totais'],
-                name='Media Estoque', marker_color='#991B1B',
+                name='Estoque Medio', marker_color='#333333',
                 text=df_irr_m['restricoes_totais'].apply(lambda x: f"{x:.0f}"), textposition='auto'
             ))
             fig_bal_m.add_trace(go.Bar(
                 x=df_irr_m['mes_ano'], y=df_irr_m['restricoes_removidas'],
-                name='Total Removidas', marker_color='#065F46',
+                name='Removidas Total', marker_color=lavie_orange,
                 text=df_irr_m['restricoes_removidas'], textposition='auto'
             ))
             fig_bal_m.update_layout(
@@ -314,40 +297,31 @@ def app(obra_id_param):
             st.info("Sem dados historicos de restricoes.")
 
     with t3:
-        st.markdown("##### Principais Ofensores (Pareto)")
+        st.markdown("##### Ocorrencias por Causa")
         if not df_prob.empty:
             col_prob = 'problema_descricao' if 'problema_descricao' in df_prob.columns else 'problema'
             
             if col_prob in df_prob.columns:
-                df_pareto = df_prob.groupby(col_prob)['quantidade'].sum().reset_index()
-                df_pareto = df_pareto.sort_values('quantidade', ascending=False)
+                df_bar = df_prob.groupby(col_prob)['quantidade'].sum().reset_index()
+                df_bar = df_bar.sort_values('quantidade', ascending=True) 
                 
-                df_pareto['acumulado'] = df_pareto['quantidade'].cumsum()
-                df_pareto['perc_acumulado'] = (df_pareto['acumulado'] / df_pareto['quantidade'].sum()) * 100
+                fig_bar_prob = px.bar(
+                    df_bar, 
+                    x='quantidade', 
+                    y=col_prob, 
+                    orientation='h',
+                    text_auto=True,
+                    color_discrete_sequence=[lavie_orange]
+                )
                 
-                fig_par = go.Figure()
-                
-                fig_par.add_trace(go.Bar(
-                    x=df_pareto[col_prob], y=df_pareto['quantidade'],
-                    name='Ocorrencias', marker_color='#EF4444',
-                    text=df_pareto['quantidade'], textposition='auto'
-                ))
-                
-                fig_par.add_trace(go.Scatter(
-                    x=df_pareto[col_prob], y=df_pareto['perc_acumulado'],
-                    name='% Acumulado', yaxis='y2',
-                    mode='lines+markers', line=dict(color='white', width=2)
-                ))
-                
-                fig_par.update_layout(
+                fig_bar_prob.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                     font_color="white",
-                    xaxis_title="Causa", yaxis_title="Qtd",
-                    yaxis2=dict(title="Acumulado (%)", overlaying='y', side='right', range=[0, 110], showgrid=False),
-                    height=500,
-                    legend=dict(orientation="h", y=1.1, x=0)
+                    xaxis_title="Quantidade", yaxis_title="Causa",
+                    height=500
                 )
-                st.plotly_chart(fig_par, use_container_width=True)
+                fig_bar_prob.update_traces(textposition='outside')
+                st.plotly_chart(fig_bar_prob, use_container_width=True)
             else:
                 st.error("Erro na coluna de dados.")
         else:
