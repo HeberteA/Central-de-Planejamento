@@ -86,7 +86,7 @@ def card_metrica(label, value, suffix="", color="#1E1E1E"):
     </div>
     """, unsafe_allow_html=True)
 
-def plot_bar_week(df, x_col, y_col, color_col, title, color_seq, y_title="%"):
+def plot_bar_week_grouped(df, x_col, y_col, color_col, title, color_seq, y_title="%"):
     fig = px.bar(
         df, x=x_col, y=y_col, 
         color=color_col, barmode="group",
@@ -181,14 +181,14 @@ def app(obra_id_param):
 
     with k1: card_metrica("PPC Medio", f"{avg_ppc:.0f}", "%")
     with k2: card_metrica("PAP Medio", f"{avg_pap:.0f}", "%")
-    with k3: card_metrica("Restricoes Totais", f"{tot_restricoes}")
+    with k3: card_metrica("Total Restricoes", f"{tot_restricoes}")
     with k4: card_metrica("Total Removidas", f"{tot_removidas}")
-    with k5: card_metrica("Saldo Restricoes", f"{saldo_aberto}")
+    with k5: card_metrica("Saldo Pendente", f"{saldo_aberto}")
     with k6: card_metrica("Maior Ofensor", f"{count_ofensor}", f"\n{maior_ofensor}")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    t1, t2, t3 = st.tabs(["Producao (PPC/PAP)", "Restricoes (Quantitativo)", "Problemas"])
+    t1, t2, t3 = st.tabs(["Producao", "Restricoes", "Problemas"])
 
     with t1:
         st.markdown("##### Tendencia Mensal")
@@ -239,12 +239,12 @@ def app(obra_id_param):
                 
                 col_ppc, col_pap = st.columns(2)
                 with col_ppc:
-                    st.plotly_chart(plot_bar_week(df_mes, "semana_ref", "ppc", "obra_nome", "PPC Semanal", lavie_palette), use_container_width=True)
+                    st.plotly_chart(plot_bar_week_grouped(df_mes, "semana_ref", "ppc", "obra_nome", "PPC Semanal", lavie_palette), use_container_width=True)
                 with col_pap:
-                    st.plotly_chart(plot_bar_week(df_mes, "semana_ref", "pap", "obra_nome", "PAP Semanal", lavie_palette), use_container_width=True)
+                    st.plotly_chart(plot_bar_week_grouped(df_mes, "semana_ref", "pap", "obra_nome", "PAP Semanal", lavie_palette), use_container_width=True)
             
             st.markdown("---")
-            st.markdown("##### Analise Comparativa (Novos Graficos)")
+            st.markdown("##### Analise Comparativa")
             g_new1, g_new2 = st.columns(2)
             
             with g_new1:
@@ -261,7 +261,7 @@ def app(obra_id_param):
                 st.plotly_chart(fig_heat, use_container_width=True)
                 
             with g_new2:
-                st.markdown("**Ranking de Obras (PPC Medio do Periodo)**")
+                st.markdown("**Ranking de Obras (PPC Medio)**")
                 df_rank = df_ind.groupby('obra_nome')['ppc'].mean().reset_index().sort_values('ppc', ascending=True)
                 fig_rank = px.bar(
                     df_rank, x='ppc', y='obra_nome', orientation='h', text_auto='.1f',
@@ -328,17 +328,17 @@ def app(obra_id_param):
                 col_rest, col_rem = st.columns(2)
                 
                 with col_rest:
-                    st.plotly_chart(plot_bar_week(df_irr_sem, "semana_ref", "restricoes_totais", "obra_nome", "Restricoes Totais", lavie_palette, "Qtd"), use_container_width=True)
+                    st.plotly_chart(plot_bar_week_grouped(df_irr_sem, "semana_ref", "restricoes_totais", "obra_nome", "Total Restricoes", lavie_palette, "Qtd"), use_container_width=True)
                 
                 with col_rem:
-                    st.plotly_chart(plot_bar_week(df_irr_sem, "semana_ref", "restricoes_removidas", "obra_nome", "Removidas", lavie_palette, "Qtd"), use_container_width=True)
+                    st.plotly_chart(plot_bar_week_grouped(df_irr_sem, "semana_ref", "restricoes_removidas", "obra_nome", "Removidas", lavie_palette, "Qtd"), use_container_width=True)
 
             st.markdown("---")
-            st.markdown("##### Analise de Eficiencia (Novos Graficos)")
+            st.markdown("##### Analise de Eficiencia")
             
             e1, e2 = st.columns(2)
             with e1:
-                st.markdown("**Resolutividade por Obra (Scatter)**")
+                st.markdown("**Resolutividade por Obra**")
                 df_eff = df_irr.groupby('obra_nome').agg({
                     'restricoes_totais': 'sum',
                     'restricoes_removidas': 'sum'
@@ -367,10 +367,10 @@ def app(obra_id_param):
                 df_acum['saldo_acumulado'] = df_acum['saldo'].cumsum()
                 
                 fig_area = px.area(df_acum, x='sort_date', y='saldo_acumulado')
-                fig_area.update_traces(line_color=lavie_orange, fill_color='rgba(227, 112, 38, 0.3)')
+                fig_area.update_traces(line_color=lavie_orange, fillcolor='rgba(227, 112, 38, 0.3)')
                 fig_area.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    font_color="white", height=350, title="Backlog Acumulado no Tempo",
+                    font_color="white", height=350, title="Backlog Acumulado",
                     xaxis_title="Data", yaxis_title="Saldo Restricoes"
                 )
                 st.plotly_chart(fig_area, use_container_width=True)
@@ -419,7 +419,7 @@ def app(obra_id_param):
                     st.plotly_chart(fig_pie, use_container_width=True)
                 
                 st.markdown("---")
-                st.markdown("##### Analise de Problemas (Novos Graficos)")
+                st.markdown("##### Analise Detalhada")
                 
                 n_p1, n_p2 = st.columns(2)
                 
