@@ -5,12 +5,13 @@ import time
 from modules import database
 from modules import ui
 import json
+import math
 
 def update_record(id, field, value):
     supabase = database.get_db_client()
     try:
         supabase.table("pcp_programacao_semanal").update({field: value}).eq("id", id).execute()
-        st.toast("Salvo!", icon="Success")
+        st.toast("Salvo!", icon="✅")
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
 
@@ -23,8 +24,10 @@ def get_month_name(dt):
     return f"{meses[dt.month]}"
 
 def get_week_label(dt):
-    semana = dt.isocalendar()[1]
-    return f"SEMANA {semana}"
+    first_day = dt.replace(day=1)
+    adjusted_day = dt.day + first_day.weekday()
+    week_num = (adjusted_day - 1) // 7 + 1
+    return f"SEMANA {week_num}"
 
 def app(obra_id):
     st.markdown("""
@@ -107,7 +110,6 @@ def app(obra_id):
             text-transform: uppercase;
             float: right;
         }
-        /* Ajuste do Checkbox e Input no Formulario */
         .day-input-group {
             background: #262626;
             padding: 8px;
@@ -160,8 +162,6 @@ def app(obra_id):
         c_top = st.container()
         
         c_a, c_b, c_c = c_top.columns(3)
-        
-        
         
         with c_a:
             usar_texto = st.toggle("Digitar Manualmente?", key="tgg_atv_manual")
@@ -216,7 +216,7 @@ def app(obra_id):
                 }
                 try:
                     supabase.table("pcp_programacao_semanal").insert(dados).execute()
-                    st.toast("Lancado com sucesso!")
+                    st.toast("Lancado com sucesso!", icon="✅")
                     time.sleep(0.5)
                     st.rerun()
                 except Exception as e:
@@ -233,10 +233,8 @@ def app(obra_id):
 
     total_atividades = 0
     total_concluidas = 0
-    
     total_dias_programados = 0
     total_dias_executados = 0
-    
     ppc_percent = 0.0
     pap_percent = 0.0
 
@@ -347,7 +345,6 @@ def app(obra_id):
             def day_widget(col_obj, label, db_val_rec, db_val_chk, suffix_id):
                 with col_obj:
                     is_disabled = (db_val_rec is None or str(db_val_rec).strip() == '')
-                    
                     st.markdown(f"<div class='day-label'>{label}</div>", unsafe_allow_html=True)
                     if not is_disabled:
                         chk = st.checkbox("ok", value=db_val_chk, key=f"chk_{label}_{suffix_id}", label_visibility="collapsed")
@@ -364,15 +361,11 @@ def app(obra_id):
             chk_sex, txt_sex = day_widget(d5, "SEX", row['rec_sex'], row['feito_sex'], row['id'])
 
             st.markdown('<div style="margin-top: 5px; border-top: 1px solid #333; padding-top: 10px;">', unsafe_allow_html=True)
-            
             c_btn1, c_btn2 = st.columns([2, 1])
             
             with c_btn1:
                 if st.button("Salvar", key=f"save_{row['id']}", use_container_width=True):
-                    up_data = {
-                        "status": st.session_state[f"st_{row['id']}"],
-                    }
-                    
+                    up_data = {"status": st.session_state[f"st_{row['id']}"]}
                     if txt_seg is not None: 
                         up_data["rec_seg"] = txt_seg
                         up_data["feito_seg"] = chk_seg
@@ -391,13 +384,12 @@ def app(obra_id):
 
                     if st.session_state[f"st_{row['id']}"] == "Nao Concluido":
                         causa_val = st.session_state.get(f"causa_{row['id']}")
-                        if causa_val:
-                            up_data['causa'] = causa_val
+                        if causa_val: up_data['causa'] = causa_val
                     else:
                         up_data['causa'] = None
 
                     supabase.table("pcp_programacao_semanal").update(up_data).eq("id", row['id']).execute()
-                    st.toast("Salvo!", icon="Success")
+                    st.toast("Salvo!", icon="✅")
                     st.rerun()
 
             with c_btn2:
@@ -437,7 +429,6 @@ def app(obra_id):
                     "data_referencia": data_ref_str
                 }).execute()
                 
-                # 3. Insere PAP (Outra linha específica)
                 supabase.table("pcp_historico_indicadores").insert({
                     "obra_id": obra_id,
                     "mes": mes_nome,
