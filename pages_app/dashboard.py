@@ -28,8 +28,13 @@ def load_data(supabase, obra_id, start_date, end_date):
             df_ind['data_ref'] = pd.to_datetime(df_ind['data_referencia'])
             
             if 'tipo_indicador' in df_ind.columns:
+                # Agrupa por data e semana_ref para preservar o nome da semana
+                cols_index = ['data_ref']
+                if 'semana_ref' in df_ind.columns:
+                    cols_index.append('semana_ref')
+                
                 df_pivot = df_ind.pivot_table(
-                    index='data_ref', 
+                    index=cols_index, 
                     columns='tipo_indicador', 
                     values='valor_percentual', 
                     aggfunc='mean' 
@@ -53,6 +58,7 @@ def load_data(supabase, obra_id, start_date, end_date):
     if not df_irr.empty:
         df_irr['data'] = pd.to_datetime(df_irr['data_referencia'])
         if obra_id is None:
+            # Se for todas as obras, recalcula a media ponderada
             df_irr = df_irr.groupby('data').agg({
                 'restricoes_totais': 'sum',
                 'restricoes_removidas': 'sum'
@@ -145,18 +151,21 @@ def app(obra_id_param):
         if not df_ind.empty:
             df_ind = df_ind.sort_values('data')
             
+            # Define eixo X: usa semana_ref se existir, senao data
+            eixo_x = 'semana_ref' if 'semana_ref' in df_ind.columns else 'data'
+            
             st.markdown("##### Desempenho Semanal")
             fig = go.Figure()
             
             fig.add_trace(go.Scatter(
-                x=df_ind['data'], y=df_ind['ppc'],
+                x=df_ind[eixo_x], y=df_ind['ppc'],
                 mode='lines+markers+text', name='PPC',
                 text=df_ind['ppc'].apply(lambda x: f"{x:.0f}%"), textposition='top center',
                 line=dict(color='#3B82F6', width=3)
             ))
             
             fig.add_trace(go.Scatter(
-                x=df_ind['data'], y=df_ind['pap'],
+                x=df_ind[eixo_x], y=df_ind['pap'],
                 mode='lines+markers+text', name='PAP',
                 text=df_ind['pap'].apply(lambda x: f"{x:.0f}%"), textposition='bottom center',
                 line=dict(color='#4ADE80', width=3, dash='dot')
