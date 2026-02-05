@@ -157,7 +157,8 @@ def app(obra_id_param):
     avg_pap = df_ind['pap'].mean() if not df_ind.empty else 0
     
     if not df_irr.empty:
-        tot_restricoes = df_irr['restricoes_totais'].sum()
+        df_latest = df_irr.sort_values('data', ascending=False).drop_duplicates(['obra_id', 'semana_ref'])
+        tot_restricoes = df_latest['restricoes_totais'].sum()
         tot_removidas = df_irr['restricoes_removidas'].sum()
         saldo_aberto = tot_restricoes - tot_removidas
         if saldo_aberto < 0: saldo_aberto = 0
@@ -181,14 +182,14 @@ def app(obra_id_param):
 
     with k1: card_metrica("PPC Medio", f"{avg_ppc:.0f}", "%")
     with k2: card_metrica("PAP Medio", f"{avg_pap:.0f}", "%")
-    with k3: card_metrica("Total Restricoes", f"{tot_restricoes}")
+    with k3: card_metrica("Restricoes Totais", f"{tot_restricoes}")
     with k4: card_metrica("Total Removidas", f"{tot_removidas}")
-    with k5: card_metrica("Saldo Pendente", f"{saldo_aberto}")
+    with k5: card_metrica("Saldo Restricoes", f"{saldo_aberto}")
     with k6: card_metrica("Maior Ofensor", f"{count_ofensor}", f"\n{maior_ofensor}")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    t1, t2, t3 = st.tabs(["Producao", "Restricoes", "Problemas"])
+    t1, t2, t3 = st.tabs(["Producao (PPC/PAP)", "Restricoes (Quantitativo)", "Problemas"])
 
     with t1:
         st.markdown("##### Tendencia Mensal")
@@ -224,7 +225,7 @@ def app(obra_id_param):
             st.markdown("##### Detalhamento Semanal")
             
             meses_unicos = df_ind[['mes_ano_label', 'sort_date']].drop_duplicates().sort_values('sort_date')
-            lista_meses = meses_unicos['mes_ano_label'].tolist()
+            lista_meses = meses_unicos['mes_ano_label'].unique().tolist()
             
             c_sel, _ = st.columns([1, 3])
             if lista_meses:
@@ -281,7 +282,7 @@ def app(obra_id_param):
             st.markdown("##### Evolucao Mensal (Restricoes vs Removidas)")
             
             df_irr_m = df_irr.groupby('mes_ano_label').agg({
-                'restricoes_totais': 'sum', 
+                'restricoes_totais': 'max', 
                 'restricoes_removidas': 'sum', 
                 'sort_date': 'min'
             }).reset_index()
@@ -312,7 +313,7 @@ def app(obra_id_param):
             st.markdown("##### Detalhamento Semanal")
             
             meses_irr = df_irr[['mes_ano_label', 'sort_date']].drop_duplicates().sort_values('sort_date')
-            lista_meses_irr = meses_irr['mes_ano_label'].tolist()
+            lista_meses_irr = meses_irr['mes_ano_label'].unique().tolist()
             
             c_sel_i, _ = st.columns([1, 3])
             if lista_meses_irr:
@@ -328,7 +329,7 @@ def app(obra_id_param):
                 col_rest, col_rem = st.columns(2)
                 
                 with col_rest:
-                    st.plotly_chart(plot_bar_week_grouped(df_irr_sem, "semana_ref", "restricoes_totais", "obra_nome", "Total Restricoes", lavie_palette, "Qtd"), use_container_width=True)
+                    st.plotly_chart(plot_bar_week_grouped(df_irr_sem, "semana_ref", "restricoes_totais", "obra_nome", "Restricoes Totais", lavie_palette, "Qtd"), use_container_width=True)
                 
                 with col_rem:
                     st.plotly_chart(plot_bar_week_grouped(df_irr_sem, "semana_ref", "restricoes_removidas", "obra_nome", "Removidas", lavie_palette, "Qtd"), use_container_width=True)
@@ -340,7 +341,7 @@ def app(obra_id_param):
             with e1:
                 st.markdown("**Resolutividade por Obra**")
                 df_eff = df_irr.groupby('obra_nome').agg({
-                    'restricoes_totais': 'sum',
+                    'restricoes_totais': 'max',
                     'restricoes_removidas': 'sum'
                 }).reset_index()
                 df_eff['eficiencia'] = (df_eff['restricoes_removidas'] / df_eff['restricoes_totais'] * 100).fillna(0)
@@ -361,7 +362,7 @@ def app(obra_id_param):
             with e2:
                 st.markdown("**Evolucao de Saldo Acumulado**")
                 df_acum = df_irr.groupby('sort_date').agg({
-                    'restricoes_totais': 'sum', 'restricoes_removidas': 'sum'
+                    'restricoes_totais': 'max', 'restricoes_removidas': 'sum'
                 }).reset_index()
                 df_acum['saldo'] = df_acum['restricoes_totais'] - df_acum['restricoes_removidas']
                 df_acum['saldo_acumulado'] = df_acum['saldo'].cumsum()
