@@ -18,16 +18,12 @@ def load_data(supabase, obra_id, start_date, end_date):
         q = supabase.table(table).select("*")
         if obra_id: 
             q = q.eq("obra_id", obra_id)
-        
         if date_col:
             q = q.gte(date_col, start_date).lte(date_col, end_date)
-        
-        if date_col:
             q = q.order(date_col)
-            
         return q.execute()
 
-    # 1. INDICADORES (PPC/PAP)
+    # 1. INDICADORES
     resp_ind = apply_query("pcp_historico_indicadores", "data_referencia")
     df_ind = pd.DataFrame(resp_ind.data) if resp_ind.data else pd.DataFrame()
 
@@ -35,16 +31,16 @@ def load_data(supabase, obra_id, start_date, end_date):
         df_ind['obra_nome'] = df_ind['obra_id'].map(obras_map).fillna("Desconhecida")
         if 'data_referencia' in df_ind.columns:
             df_ind['data_ref'] = pd.to_datetime(df_ind['data_referencia'])
-            # Cria coluna de ordenacao por Mes/Ano para o grafico de tendencia
+            # Coluna auxiliar para ordenacao de data
+            df_ind['sort_date'] = df_ind['data_ref']
             df_ind['mes_ano_label'] = df_ind['data_ref'].dt.strftime('%m/%Y')
-            
-            # Garante coluna semana_ref
+
             if 'semana_ref' not in df_ind.columns:
                 df_ind['semana_ref'] = df_ind['data_ref'].apply(lambda d: f"Semana {d.isocalendar()[1]}")
 
             if 'tipo_indicador' in df_ind.columns:
                 df_pivot = df_ind.pivot_table(
-                    index=['data_ref', 'mes_ano_label', 'semana_ref', 'obra_nome', 'obra_id'], 
+                    index=['data_ref', 'sort_date', 'mes_ano_label', 'semana_ref', 'obra_nome', 'obra_id'], 
                     columns='tipo_indicador', 
                     values='valor_percentual', 
                     aggfunc='mean' 
@@ -59,32 +55,27 @@ def load_data(supabase, obra_id, start_date, end_date):
             else:
                 df_ind['data'] = df_ind['data_ref']
     else:
-        df_ind = pd.DataFrame(columns=['data', 'ppc', 'pap', 'obra_nome', 'semana_ref', 'mes_ano_label'])
+        df_ind = pd.DataFrame(columns=['data', 'ppc', 'pap', 'obra_nome', 'semana_ref', 'mes_ano_label', 'sort_date'])
 
-    # 2. IRR (RESTRICOES)
+    # 2. IRR
     resp_irr = apply_query("pcp_historico_irr", "data_referencia")
     df_irr = pd.DataFrame(resp_irr.data) if resp_irr.data else pd.DataFrame()
     
     if not df_irr.empty:
         df_irr['data'] = pd.to_datetime(df_irr['data_referencia'])
+        df_irr['sort_date'] = df_irr['data']
         df_irr['mes_ano_label'] = df_irr['data'].dt.strftime('%m/%Y')
-        df_irr['obra_nome'] = df_irr['obra_id'].map(obras_map).fillna("Desconhecida")
         
         if 'semana_ref' not in df_irr.columns:
             df_irr['semana_ref'] = df_irr['data'].apply(lambda d: f"Semana {d.isocalendar()[1]}")
-
-        # Se for visao global (Todas as Obras), agrupa para nao duplicar linhas no grafico de tendencia
+            
         if obra_id is None:
-            # Agrupamento diario para tendencia
-            df_irr_agg = df_irr.groupby(['data', 'mes_ano_label', 'semana_ref']).agg({
+            # Agrupa tudo, somando quantidades
+            df_irr = df_irr.groupby(['data', 'sort_date', 'mes_ano_label', 'semana_ref']).agg({
                 'restricoes_totais': 'sum',
                 'restricoes_removidas': 'sum'
             }).reset_index()
-            df_irr_agg['irr_percentual'] = (df_irr_agg['restricoes_removidas'] / df_irr_agg['restricoes_totais'] * 100).fillna(0)
-            df_irr_agg['obra_nome'] = 'Geral'
-            # Mantem o df detalhado para o grafico de barras (por obra) se necessario, ou usa o agg
-            # Para simplificar a visao global, usaremos o agg como base principal, mas o df_irr original tem o detalhe por obra
-    
+
     # 3. PROBLEMAS
     resp_prob = apply_query("pcp_historico_problemas", "data_referencia")
     df_prob = pd.DataFrame(resp_prob.data) if resp_prob.data else pd.DataFrame()
@@ -107,8 +98,7 @@ def app(obra_id_param):
     is_admin = user.get('role') == 'admin'
 
     lavie_orange = '#E37026'
-    
-    # --- SELECAO DE OBRA ---
+
     obra_id = obra_id_param
     if is_admin:
         try:
@@ -127,13 +117,13 @@ def app(obra_id_param):
                 obra_id = opcoes[selected_nome]
         except: pass
 
-    # --- FILTROS DE DATA ---
     c_filtros = st.container()
     col_f1, col_f2 = c_filtros.columns([3, 1])
     
     with col_f1:
         d_end = datetime.now()
-        d_start = d_end - timedelta(days=120) # 4 meses padrao
+        # Ampliei o range padrao para pegar historico maior caso exista
+        d_start = d_end - timedelta(days=180) 
         dates = st.date_input("Periodo de Analise", [d_start, d_end])
         s_date, e_date = (dates[0], dates[1]) if len(dates) == 2 else (d_start, d_end)
             
@@ -146,211 +136,221 @@ def app(obra_id_param):
 
     st.markdown("---")
 
-    # --- KPI CARDS (LINHA SUPERIOR) ---
-    k1, k2, k3, k4, k5 = st.columns(5)
+    # --- KPI CARDS EXTENDIDOS ---
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
     
     avg_ppc = df_ind['ppc'].mean() if not df_ind.empty else 0
     avg_pap = df_ind['pap'].mean() if not df_ind.empty else 0
     
-    # Calculos IRR
     if not df_irr.empty:
         tot_estoque = df_irr['restricoes_totais'].sum()
         tot_removidas = df_irr['restricoes_removidas'].sum()
-        # Media do IRR percentual (semana a semana)
-        avg_irr = df_irr['irr_percentual'].mean() if 'irr_percentual' in df_irr.columns else 0
+        # Saldo simples
+        saldo_aberto = tot_estoque - tot_removidas
+        if saldo_aberto < 0: saldo_aberto = 0
     else:
         tot_estoque = 0
         tot_removidas = 0
-        avg_irr = 0
+        saldo_aberto = 0
         
-    # Maior Ofensor
     maior_ofensor = "-"
+    count_ofensor = 0
     if not df_prob.empty:
         col_prob = 'problema_descricao' if 'problema_descricao' in df_prob.columns else 'problema'
         if col_prob in df_prob.columns:
             top = df_prob.groupby(col_prob)['quantidade'].sum().sort_values(ascending=False).head(1)
             if not top.empty:
-                maior_ofensor = f"{top.index[0]} ({top.values[0]})"
-                if len(maior_ofensor) > 25: maior_ofensor = top.index[0][:22] + "..."
+                count_ofensor = top.values[0]
+                maior_ofensor = top.index[0]
+                if len(maior_ofensor) > 15: maior_ofensor = maior_ofensor[:12] + "..."
 
     with k1: card_metrica("PPC Medio", f"{avg_ppc:.0f}", "%")
     with k2: card_metrica("PAP Medio", f"{avg_pap:.0f}", "%")
-    with k3: card_metrica("IRR Medio", f"{avg_irr:.0f}", "%")
-    with k4: card_metrica("Restricoes Resolvidas", f"{tot_removidas}")
-    with k5: card_metrica("Principal Ofensor", "", f"{maior_ofensor}")
+    with k3: card_metrica("Total Estoque", f"{tot_estoque}")
+    with k4: card_metrica("Total Removidas", f"{tot_removidas}")
+    with k5: card_metrica("Saldo Pendente", f"{saldo_aberto}")
+    with k6: card_metrica("Maior Ofensor", f"{count_ofensor}", f"\n{maior_ofensor}")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- ABAS ---
-    t1, t2, t3 = st.tabs(["Producao (PPC/PAP)", "Restricoes (IRR)", "Problemas"])
+    t1, t2, t3 = st.tabs(["Producao (PPC/PAP)", "Restricoes (Quantitativo)", "Problemas"])
 
     # ========================== ABA PRODUCAO ==========================
     with t1:
+        st.markdown("##### Tendencia Mensal")
         if not df_ind.empty:
-            # 1. Grafico de Tendencia Mensal (Macro)
-            st.markdown("##### Evolucao Mensal (Tendencia)")
+            # Agrupa por mes e usa a data minima do mes para ordenar corretamente
+            df_ind_m = df_ind.groupby('mes_ano_label').agg({
+                'ppc': 'mean', 
+                'pap': 'mean', 
+                'sort_date': 'min'
+            }).reset_index()
             
-            # Agrupa por mes para a linha de tendencia
-            df_ind_m = df_ind.groupby('mes_ano_label')[['ppc', 'pap']].mean().reset_index()
-            # Ordenacao cronologica
-            df_order = df_ind[['mes_ano_label', 'data']].sort_values('data').drop_duplicates('mes_ano_label')
-            df_ind_m = df_ind_m.merge(df_order[['mes_ano_label']], on='mes_ano_label')
+            # ORDENACAO CRONOLOGICA FORCADA
+            df_ind_m = df_ind_m.sort_values('sort_date')
             
             fig_trend = go.Figure()
             fig_trend.add_trace(go.Scatter(
                 x=df_ind_m['mes_ano_label'], y=df_ind_m['ppc'],
-                mode='lines+markers+text', name='PPC Mensal',
+                mode='lines+markers+text', name='PPC',
                 text=df_ind_m['ppc'].apply(lambda x: f"{x:.0f}%"), textposition='top center',
                 line=dict(color=lavie_orange, width=3)
             ))
             fig_trend.add_trace(go.Scatter(
                 x=df_ind_m['mes_ano_label'], y=df_ind_m['pap'],
-                mode='lines+markers', name='PAP Mensal',
+                mode='lines+markers', name='PAP',
                 line=dict(color='#888', width=3, dash='dot')
             ))
             fig_trend.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                font_color="white", xaxis_title="Mes", yaxis_title="Media %",
+                font_color="white", xaxis_title="", yaxis_title="%",
                 margin=dict(t=20, b=20), height=300,
                 legend=dict(orientation="h", y=1.1)
             )
-            # Cliponaxis False para nao cortar labels
             fig_trend.update_traces(cliponaxis=False)
             st.plotly_chart(fig_trend, use_container_width=True)
             
             st.markdown("---")
-            
-            # 2. Detalhamento Semanal com Filtro de Mes
             st.markdown("##### Detalhamento Semanal")
             
-            meses_disp = df_ind['mes_ano_label'].unique().tolist()
-            # Ordena meses
-            meses_sorted = sorted(meses_disp, key=lambda x: datetime.strptime(x, "%m/%Y"))
+            # Dropdown ordenado cronologicamente
+            meses_unicos = df_ind[['mes_ano_label', 'sort_date']].drop_duplicates().sort_values('sort_date')
+            lista_meses = meses_unicos['mes_ano_label'].tolist()
             
             c_sel, _ = st.columns([1, 3])
-            mes_sel = c_sel.selectbox("Selecione o Mes:", meses_sorted, index=len(meses_sorted)-1, key="sel_mes_prod")
-            
-            df_mes = df_ind[df_ind['mes_ano_label'] == mes_sel].copy()
-            # Ordena por semana_ref
-            df_mes = df_mes.sort_values('semana_ref')
-            
-            col_ppc, col_pap = st.columns(2)
-            
-            # Funcao para gerar grafico de barra padrao
-            def plot_bar_week(df, y_col, title, color_seq):
-                fig = px.bar(
-                    df, x="semana_ref", y=y_col, 
-                    color="obra_nome", barmode="group",
-                    text_auto='.0f', color_discrete_sequence=color_seq
-                )
-                # Aumenta range Y para caber o label (max value * 1.15)
-                max_val = df[y_col].max() if not df.empty else 100
-                fig.update_layout(
-                    title=title,
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    font_color="white", xaxis_title="", yaxis_title="%",
-                    yaxis_range=[0, max_val * 1.2],
-                    legend=dict(orientation="h", y=-0.15),
-                    margin=dict(t=40, b=20), height=380,
-                    uniformtext_minsize=8, uniformtext_mode='hide'
-                )
-                fig.update_traces(textposition='outside', cliponaxis=False)
-                return fig
-
-            with col_ppc:
-                # Cores Lavie para Obras (Laranja, Cinza Escuro, Cinza Claro...)
-                paleta_obras = [lavie_orange, '#444444', '#777777', '#AAAAAA']
-                st.plotly_chart(plot_bar_week(df_mes, "ppc", "PPC Semanal", paleta_obras), use_container_width=True)
+            if lista_meses:
+                mes_sel = c_sel.selectbox("Mes:", lista_meses, index=len(lista_meses)-1, key="sel_mes_prod")
                 
-            with col_pap:
-                st.plotly_chart(plot_bar_week(df_mes, "pap", "PAP Semanal", paleta_obras), use_container_width=True)
+                df_mes = df_ind[df_ind['mes_ano_label'] == mes_sel].copy()
+                # Tenta ordenar semanas numericamente
+                try:
+                    df_mes['sem_num'] = df_mes['semana_ref'].str.extract(r'(\d+)').astype(float)
+                    df_mes = df_mes.sort_values('sem_num')
+                except:
+                    df_mes = df_mes.sort_values('semana_ref')
+                
+                col_ppc, col_pap = st.columns(2)
+                
+                def plot_bar_week(df, y_col, title, color_seq):
+                    fig = px.bar(
+                        df, x="semana_ref", y=y_col, 
+                        color="obra_nome", barmode="group",
+                        text_auto='.0f', color_discrete_sequence=color_seq
+                    )
+                    max_val = df[y_col].max() if not df.empty else 100
+                    fig.update_layout(
+                        title=title,
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        font_color="white", xaxis_title="", yaxis_title="%",
+                        yaxis_range=[0, max_val * 1.25], # Margem extra p/ nao cortar
+                        legend=dict(orientation="h", y=-0.15),
+                        margin=dict(t=40, b=20), height=380,
+                        uniformtext_minsize=8, uniformtext_mode='hide'
+                    )
+                    fig.update_traces(textposition='outside', cliponaxis=False)
+                    return fig
 
+                paleta = [lavie_orange, '#444444', '#777777', '#AAAAAA']
+                with col_ppc:
+                    st.plotly_chart(plot_bar_week(df_mes, "ppc", "PPC Semanal", paleta), use_container_width=True)
+                with col_pap:
+                    st.plotly_chart(plot_bar_week(df_mes, "pap", "PAP Semanal", paleta), use_container_width=True)
         else:
-            st.info("Sem dados de producao para o periodo.")
+            st.info("Sem dados de producao.")
 
     # ========================== ABA RESTRICOES ==========================
     with t2:
         if not df_irr.empty:
-            # 1. Grafico de Tendencia Mensal (Macro) - Linha IRR
-            st.markdown("##### Evolucao Mensal (Tendencia)")
+            st.markdown("##### Evolucao Mensal (Estoque vs Removidas)")
             
-            # Se for Geral, precisa recalcular media ponderada por mes
-            if obra_id is None:
-                df_irr_m = df_irr.groupby('mes_ano_label').agg({
-                    'restricoes_totais': 'sum', 'restricoes_removidas': 'sum', 'data': 'min'
-                }).reset_index()
-                df_irr_m['irr_percentual'] = (df_irr_m['restricoes_removidas'] / df_irr_m['restricoes_totais'] * 100).fillna(0)
-            else:
-                df_irr_m = df_irr.groupby('mes_ano_label')[['irr_percentual', 'data']].mean().reset_index()
-
-            df_irr_m = df_irr_m.sort_values('data')
+            # Agrupa por mes com data minima para ordenacao
+            df_irr_m = df_irr.groupby('mes_ano_label').agg({
+                'restricoes_totais': 'sum', 
+                'restricoes_removidas': 'sum', 
+                'sort_date': 'min'
+            }).reset_index()
             
-            fig_irr_trend = go.Figure()
-            fig_irr_trend.add_trace(go.Scatter(
-                x=df_irr_m['mes_ano_label'], y=df_irr_m['irr_percentual'],
-                mode='lines+markers+text', name='IRR %',
-                text=df_irr_m['irr_percentual'].apply(lambda x: f"{x:.0f}%"), textposition='top center',
+            df_irr_m = df_irr_m.sort_values('sort_date')
+            
+            fig_trend_irr = go.Figure()
+            # Linha Estoque
+            fig_trend_irr.add_trace(go.Scatter(
+                x=df_irr_m['mes_ano_label'], y=df_irr_m['restricoes_totais'],
+                mode='lines+markers+text', name='Estoque Total',
+                text=df_irr_m['restricoes_totais'], textposition='top center',
+                line=dict(color='#333333', width=3)
+            ))
+            # Linha Removidas
+            fig_trend_irr.add_trace(go.Scatter(
+                x=df_irr_m['mes_ano_label'], y=df_irr_m['restricoes_removidas'],
+                mode='lines+markers+text', name='Removidas',
+                text=df_irr_m['restricoes_removidas'], textposition='bottom center',
                 line=dict(color=lavie_orange, width=3)
             ))
-            fig_irr_trend.update_layout(
+            
+            fig_trend_irr.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                font_color="white", xaxis_title="Mes", yaxis_title="IRR %",
-                margin=dict(t=20, b=20), height=300
+                font_color="white", xaxis_title="", yaxis_title="Qtd",
+                margin=dict(t=20, b=20), height=320,
+                legend=dict(orientation="h", y=1.1)
             )
-            fig_irr_trend.update_traces(cliponaxis=False)
-            st.plotly_chart(fig_irr_trend, use_container_width=True)
+            fig_trend_irr.update_traces(cliponaxis=False)
+            st.plotly_chart(fig_trend_irr, use_container_width=True)
             
             st.markdown("---")
-            
-            # 2. Detalhamento Semanal (Estoque vs Removidas) - COM FILTRO DE MES
             st.markdown("##### Detalhamento Semanal")
             
-            meses_disp_irr = df_irr['mes_ano_label'].unique().tolist()
-            meses_sorted_irr = sorted(meses_disp_irr, key=lambda x: datetime.strptime(x, "%m/%Y"))
+            # Seletor de Mes ordenado
+            meses_irr = df_irr[['mes_ano_label', 'sort_date']].drop_duplicates().sort_values('sort_date')
+            lista_meses_irr = meses_irr['mes_ano_label'].tolist()
             
-            c_sel_irr, _ = st.columns([1, 3])
-            mes_sel_irr = c_sel_irr.selectbox("Selecione o Mes:", meses_sorted_irr, index=len(meses_sorted_irr)-1, key="sel_mes_irr")
-            
-            df_irr_sem = df_irr[df_irr['mes_ano_label'] == mes_sel_irr].copy()
-            df_irr_sem = df_irr_sem.sort_values('semana_ref')
-            
-            # Se for visao Geral, agrupa as obras por semana para mostrar o total da semana
-            if obra_id is None:
-                df_irr_sem = df_irr_sem.groupby('semana_ref').agg({
+            c_sel_i, _ = st.columns([1, 3])
+            if lista_meses_irr:
+                mes_sel_irr = c_sel_i.selectbox("Mes:", lista_meses_irr, index=len(lista_meses_irr)-1, key="sel_mes_irr")
+                
+                df_irr_sem = df_irr[df_irr['mes_ano_label'] == mes_sel_irr].copy()
+                
+                # Ordena semana
+                try:
+                    df_irr_sem['sem_num'] = df_irr_sem['semana_ref'].str.extract(r'(\d+)').astype(float)
+                    df_irr_sem = df_irr_sem.sort_values('sem_num')
+                except:
+                    df_irr_sem = df_irr_sem.sort_values('semana_ref')
+                
+                # Agrupa se houver multiplas entradas para a mesma semana no mesmo mes (ex: obras diferentes na visao geral)
+                df_irr_sem_agg = df_irr_sem.groupby('semana_ref').agg({
                     'restricoes_totais': 'sum',
                     'restricoes_removidas': 'sum'
                 }).reset_index()
 
-            fig_bar_irr = go.Figure()
-            
-            # Barras Lado a Lado
-            fig_bar_irr.add_trace(go.Bar(
-                x=df_irr_sem['semana_ref'], y=df_irr_sem['restricoes_totais'],
-                name='Estoque Total', marker_color='#333333',
-                text=df_irr_sem['restricoes_totais'], textposition='outside'
-            ))
-            fig_bar_irr.add_trace(go.Bar(
-                x=df_irr_sem['semana_ref'], y=df_irr_sem['restricoes_removidas'],
-                name='Removidas', marker_color=lavie_orange,
-                text=df_irr_sem['restricoes_removidas'], textposition='outside'
-            ))
-            
-            max_y = max(df_irr_sem['restricoes_totais'].max(), df_irr_sem['restricoes_removidas'].max())
-            
-            fig_bar_irr.update_layout(
-                title=f"Fluxo de Restricoes - {mes_sel_irr}",
-                barmode='group',
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                font_color="white", xaxis_title="", yaxis_title="Qtd",
-                yaxis_range=[0, max_y * 1.2],
-                legend=dict(orientation="h", y=-0.15),
-                margin=dict(t=40, b=20), height=400
-            )
-            fig_bar_irr.update_traces(cliponaxis=False)
-            st.plotly_chart(fig_bar_irr, use_container_width=True)
+                fig_bar_irr = go.Figure()
+                fig_bar_irr.add_trace(go.Bar(
+                    x=df_irr_sem_agg['semana_ref'], y=df_irr_sem_agg['restricoes_totais'],
+                    name='Estoque', marker_color='#333333',
+                    text=df_irr_sem_agg['restricoes_totais'], textposition='outside'
+                ))
+                fig_bar_irr.add_trace(go.Bar(
+                    x=df_irr_sem_agg['semana_ref'], y=df_irr_sem_agg['restricoes_removidas'],
+                    name='Removidas', marker_color=lavie_orange,
+                    text=df_irr_sem_agg['restricoes_removidas'], textposition='outside'
+                ))
+                
+                max_val_irr = max(df_irr_sem_agg['restricoes_totais'].max(), df_irr_sem_agg['restricoes_removidas'].max())
+                
+                fig_bar_irr.update_layout(
+                    title=f"Fluxo Semanal - {mes_sel_irr}",
+                    barmode='group',
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white", xaxis_title="", yaxis_title="Qtd",
+                    yaxis_range=[0, max_val_irr * 1.25],
+                    legend=dict(orientation="h", y=-0.15),
+                    margin=dict(t=40, b=20), height=400
+                )
+                fig_bar_irr.update_traces(cliponaxis=False)
+                st.plotly_chart(fig_bar_irr, use_container_width=True)
 
         else:
-            st.info("Sem dados historicos de restricoes.")
+            st.info("Sem dados historicos.")
 
     # ========================== ABA PROBLEMAS ==========================
     with t3:
@@ -358,31 +358,29 @@ def app(obra_id_param):
             col_prob = 'problema_descricao' if 'problema_descricao' in df_prob.columns else 'problema'
             
             if col_prob in df_prob.columns:
-                # Agrupamento Total
                 df_group = df_prob.groupby(col_prob)['quantidade'].sum().reset_index()
-                df_group = df_group.sort_values('quantidade', ascending=True) # Ascendente para barra horizontal ficar certa
+                df_group = df_group.sort_values('quantidade', ascending=True)
                 
                 c_p1, c_p2 = st.columns([2, 1])
                 
                 with c_p1:
-                    st.markdown("##### Causas (Barras)")
+                    st.markdown("##### Causas (Quantitativo)")
                     fig_bar_p = px.bar(
                         df_group, x='quantidade', y=col_prob, orientation='h',
                         text_auto=True, color_discrete_sequence=[lavie_orange]
                     )
-                    # Ajuste do eixo X para dar espaco ao label
                     max_x = df_group['quantidade'].max()
                     fig_bar_p.update_layout(
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        font_color="white", xaxis_title="Qtd", yaxis_title="",
-                        xaxis_range=[0, max_x * 1.15],
-                        height=500, margin=dict(l=0)
+                        font_color="white", xaxis_title="Ocorrencias", yaxis_title="",
+                        xaxis_range=[0, max_x * 1.2],
+                        height=500
                     )
                     fig_bar_p.update_traces(textposition='outside', cliponaxis=False)
                     st.plotly_chart(fig_bar_p, use_container_width=True)
                     
                 with c_p2:
-                    st.markdown("##### Distribuicao (Rosca)")
+                    st.markdown("##### Distribuicao")
                     fig_pie = px.pie(
                         df_group, values='quantidade', names=col_prob, hole=0.5,
                         color_discrete_sequence=px.colors.sequential.Oranges_r
@@ -392,7 +390,8 @@ def app(obra_id_param):
                         font_color="white", showlegend=False,
                         height=400, margin=dict(t=0, b=0, l=0, r=0)
                     )
-                    fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                    # Forca mostrar valor (label+value) ao invez de percent
+                    fig_pie.update_traces(textposition='inside', textinfo='value+label')
                     st.plotly_chart(fig_pie, use_container_width=True)
             else:
                 st.error("Erro na coluna de dados.")
