@@ -91,7 +91,7 @@ def card_metrics(label, value, suffix="", color="#1E1E1E"):
     <div style="background-color: {color}; padding: 0px; border-radius: 8px; border: 1px solid #333; text-align: center; height: 100%; min-height: 110px; display: flex; flex-direction: column; justify-content: center;">
         <div style="font-size: 0.75rem; color: #aaa; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;">{label}</div>
         <div style="font-size: 1.6rem; font-weight: 800; color: white;">{value}</div>
-        <div style="font-size: 0.9rem; color: #E37026; margin-left: 2px;">{suffix}</div>
+        <div style="font-size: 0.6rem; color: #E37026; margin-left: 2px;">{suffix}</div>
     </div>
     """, unsafe_allow_html=True)
 
