@@ -85,6 +85,15 @@ def card_metrica(label, value, suffix="", color="#1E1E1E"):
         <div style="font-size: 1.6rem; font-weight: 800; color: white;">{value}<span style="font-size: 0.9rem; color: #E37026; margin-left: 2px;">{suffix}</span></div>
     </div>
     """, unsafe_allow_html=True)
+    
+def card_metrics(label, value, suffix="", color="#1E1E1E"):
+    st.markdown(f"""
+    <div style="background-color: {color}; padding: 15px; border-radius: 8px; border: 1px solid #333; text-align: center; height: 100%; min-height: 110px; display: flex; flex-direction: column; justify-content: center;">
+        <div style="font-size: 0.75rem; color: #aaa; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;">{label}</div>
+        <div style="font-size: 1.6rem; font-weight: 800; color: white;">{value}</div>
+        <div style="font-size: 0.9rem; color: #E37026; margin-left: 2px;">{suffix}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def plot_bar_week_grouped(df, x_col, y_col, color_col, title, color_seq, y_title="%"):
     fig = px.bar(
@@ -133,19 +142,11 @@ def app(obra_id_param):
                 obra_id = opcoes[selected_nome]
         except: pass
 
-    c_filtros = st.container()
-    col_f1, col_f2 = c_filtros.columns([3, 1])
-    
-    with col_f1:
-        d_end = datetime.now()
-        d_start = d_end - timedelta(days=180) 
-        dates = st.date_input("Periodo de Analise", [d_start, d_end])
-        s_date, e_date = (dates[0], dates[1]) if len(dates) == 2 else (d_start, d_end)
+    d_end = datetime.now()
+    d_start = d_end - timedelta(days=180) 
+    dates = st.date_input("Periodo de Analise", [d_start, d_end])
+    s_date, e_date = (dates[0], dates[1]) if len(dates) == 2 else (d_start, d_end)
             
-    with col_f2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Atualizar", use_container_width=True):
-            st.rerun()
 
     df_ind, df_irr, df_prob = load_data(supabase, obra_id, s_date.strftime('%Y-%m-%d'), e_date.strftime('%Y-%m-%d'))
 
@@ -185,7 +186,7 @@ def app(obra_id_param):
     with k3: card_metrica("Restricoes Totais", f"{tot_restricoes}")
     with k4: card_metrica("Total Removidas", f"{tot_removidas}")
     with k5: card_metrica("Saldo Restricoes", f"{saldo_aberto}")
-    with k6: card_metrica("Maior Ofensor", f"{count_ofensor}", f"\n{maior_ofensor}")
+    with k6: card_metrics("Maior Ofensor", f"{count_ofensor}", f"\n{maior_ofensor}")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
