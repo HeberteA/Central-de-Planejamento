@@ -7,6 +7,13 @@ from modules import database
 from modules import ui
 
 def load_data(supabase, obra_id, start_date, end_date):
+    obras_map = {}
+    try:
+        resp_obras = supabase.table("pcp_obras").select("id, nome").execute()
+        if resp_obras.data:
+            obras_map = {o['id']: o['nome'] for o in resp_obras.data}
+    except: pass
+
     def apply_query(table, date_col):
         q = supabase.table(table).select("*")
         if obra_id: 
@@ -24,16 +31,16 @@ def load_data(supabase, obra_id, start_date, end_date):
     df_ind = pd.DataFrame(resp_ind.data) if resp_ind.data else pd.DataFrame()
 
     if not df_ind.empty:
+        df_ind['obra_nome'] = df_ind['obra_id'].map(obras_map).fillna("Desconhecida")
+        
         if 'data_referencia' in df_ind.columns:
             df_ind['data_ref'] = pd.to_datetime(df_ind['data_referencia'])
+            df_ind['mes_ano_sort'] = df_ind['data_ref'].dt.to_period('M')
+            df_ind['mes_ano_label'] = df_ind['data_ref'].dt.strftime('%m/%Y')
             
             if 'tipo_indicador' in df_ind.columns:
-                cols_index = ['data_ref']
-                if 'semana_ref' in df_ind.columns:
-                    cols_index.append('semana_ref')
-                
                 df_pivot = df_ind.pivot_table(
-                    index=cols_index, 
+                    index=['data_ref', 'mes_ano_label', 'semana_ref', 'obra_nome', 'obra_id'], 
                     columns='tipo_indicador', 
                     values='valor_percentual', 
                     aggfunc='mean' 
@@ -49,7 +56,7 @@ def load_data(supabase, obra_id, start_date, end_date):
             else:
                 df_ind['data'] = df_ind['data_ref']
     else:
-        df_ind = pd.DataFrame(columns=['data', 'ppc', 'pap'])
+        df_ind = pd.DataFrame(columns=['data', 'ppc', 'pap', 'obra_nome', 'semana_ref', 'mes_ano_label'])
 
     resp_irr = apply_query("pcp_historico_irr", "data_referencia")
     df_irr = pd.DataFrame(resp_irr.data) if resp_irr.data else pd.DataFrame()
@@ -106,8 +113,8 @@ def app(obra_id_param):
     
     with col_f1:
         d_end = datetime.now()
-        d_start = d_end - timedelta(days=90)
-        dates = st.date_input("Periodo", [d_start, d_end])
+        d_start = d_end - timedelta(days=120)
+        dates = st.date_input("Periodo Global (Tendencia)", [d_start, d_end])
         
         if len(dates) == 2:
             s_date, e_date = dates
@@ -146,63 +153,89 @@ def app(obra_id_param):
     t1, t2, t3 = st.tabs(["Producao", "Restricoes", "Problemas"])
 
     with t1:
+        st.markdown("##### Tendencia Mensal (Macro)")
         if not df_ind.empty:
-            df_ind = df_ind.sort_values('data')
+            df_ind_m = df_ind.groupby('mes_ano_label')[['ppc', 'pap']].mean().reset_index()
             
-            eixo_x = 'semana_ref' if 'semana_ref' in df_ind.columns else 'data'
+            # Ordena meses cronologicamente recuperando a data original
+            # Truque: pega o primeiro registro de cada mes/ano no df original para ordenar
+            df_order = df_ind[['mes_ano_label', 'data']].sort_values('data').drop_duplicates('mes_ano_label')
+            df_ind_m = df_ind_m.merge(df_order[['mes_ano_label']], on='mes_ano_label')
             
-            st.markdown("##### Desempenho Semanal")
-            fig = go.Figure()
-            
-            fig.add_trace(go.Scatter(
-                x=df_ind[eixo_x], y=df_ind['ppc'],
-                mode='lines+markers+text', name='PPC',
-                text=df_ind['ppc'].apply(lambda x: f"{x:.0f}%"), textposition='top center',
+            fig_trend = go.Figure()
+            fig_trend.add_trace(go.Scatter(
+                x=df_ind_m['mes_ano_label'], y=df_ind_m['ppc'],
+                mode='lines+markers+text', name='PPC Mensal',
+                text=df_ind_m['ppc'].apply(lambda x: f"{x:.0f}%"), textposition='top center',
                 line=dict(color='#3B82F6', width=3)
             ))
-            
-            fig.add_trace(go.Scatter(
-                x=df_ind[eixo_x], y=df_ind['pap'],
-                mode='lines+markers+text', name='PAP',
-                text=df_ind['pap'].apply(lambda x: f"{x:.0f}%"), textposition='bottom center',
+            fig_trend.add_trace(go.Scatter(
+                x=df_ind_m['mes_ano_label'], y=df_ind_m['pap'],
+                mode='lines+markers', name='PAP Mensal',
                 line=dict(color='#4ADE80', width=3, dash='dot')
             ))
             
-            fig.add_hline(y=80, line_dash="dash", line_color="white", annotation_text="Meta 80%")
-            
-            fig.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                font_color="white", xaxis_title="Semana", yaxis_title="%",
-                legend=dict(orientation="h", y=1.1, x=0), height=400,
-                margin=dict(l=20, r=20, t=40, b=20)
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-            st.markdown("---")
-            st.markdown("##### Desempenho Mensal (Consolidado)")
-            
-            df_ind_m = df_ind.set_index('data')[['ppc', 'pap']].resample('ME').mean().reset_index()
-            df_ind_m['mes_ano'] = df_ind_m['data'].dt.strftime('%m/%Y')
-            
-            fig_m = go.Figure()
-            fig_m.add_trace(go.Bar(
-                x=df_ind_m['mes_ano'], y=df_ind_m['ppc'],
-                name='PPC Mensal', marker_color='#1E3A8A',
-                text=df_ind_m['ppc'].apply(lambda x: f"{x:.0f}%"), textposition='auto'
-            ))
-            fig_m.add_trace(go.Bar(
-                x=df_ind_m['mes_ano'], y=df_ind_m['pap'],
-                name='PAP Mensal', marker_color='#166534',
-                text=df_ind_m['pap'].apply(lambda x: f"{x:.0f}%"), textposition='auto'
-            ))
-            
-            fig_m.update_layout(
-                barmode='group',
+            fig_trend.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 font_color="white", xaxis_title="Mes", yaxis_title="Media %",
-                legend=dict(orientation="h", y=1.1, x=0), height=400
+                legend=dict(orientation="h", y=1.1, x=0), height=350
             )
-            st.plotly_chart(fig_m, use_container_width=True)
+            st.plotly_chart(fig_trend, use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("##### Detalhamento Semanal (Filtro por Mes)")
+            
+            meses_disponiveis = df_ind['mes_ano_label'].unique().tolist()
+            # Ordena meses unicos pela data
+            meses_sorted = sorted(meses_disponiveis, key=lambda x: datetime.strptime(x, "%m/%Y"))
+            
+            col_sel, col_vazio = st.columns([1, 3])
+            mes_selecionado = col_sel.selectbox("Selecione o Mes para Analise Semanal:", meses_sorted, index=len(meses_sorted)-1)
+            
+            df_mes = df_ind[df_ind['mes_ano_label'] == mes_selecionado].copy()
+            df_mes = df_mes.sort_values('semana_ref')
+            
+            c_ppc, c_pap = st.columns(2)
+            
+            with c_ppc:
+                st.markdown(f"**PPC Semanal - {mes_selecionado}**")
+                fig_ppc = px.bar(
+                    df_mes, 
+                    x="semana_ref", 
+                    y="ppc", 
+                    color="obra_nome", 
+                    barmode="group",
+                    text_auto='.0f',
+                    color_discrete_sequence=px.colors.qualitative.Plotly
+                )
+                fig_ppc.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white", xaxis_title="Semana", yaxis_title="PPC %",
+                    legend=dict(orientation="h", y=-0.2), height=400,
+                    uniformtext_minsize=8, uniformtext_mode='hide'
+                )
+                fig_ppc.update_traces(textposition='outside')
+                st.plotly_chart(fig_ppc, use_container_width=True)
+                
+            with c_pap:
+                st.markdown(f"**PAP Semanal - {mes_selecionado}**")
+                fig_pap = px.bar(
+                    df_mes, 
+                    x="semana_ref", 
+                    y="pap", 
+                    color="obra_nome", 
+                    barmode="group",
+                    text_auto='.0f',
+                    color_discrete_sequence=px.colors.qualitative.Safe
+                )
+                fig_pap.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white", xaxis_title="Semana", yaxis_title="PAP %",
+                    legend=dict(orientation="h", y=-0.2), height=400,
+                    uniformtext_minsize=8, uniformtext_mode='hide'
+                )
+                fig_pap.update_traces(textposition='outside')
+                st.plotly_chart(fig_pap, use_container_width=True)
 
         else:
             st.info("Sem dados de producao.")
