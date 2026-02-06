@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from modules import database
 from modules import ui
 import time
+import math
 
 def safe_date(val):
     if val is None: return None
@@ -21,8 +22,8 @@ def get_month_name(dt):
 
 def get_week_label(dt):
     if not dt: return ""
-    semana = dt.isocalendar()[1]
-    return f"SEMANA {semana}"
+    week_num = math.ceil(dt.day / 7)
+    return f"SEMANA {week_num}"
 
 def render_kpi_cards(df, start_week, end_week):
     current_month = start_week.month
