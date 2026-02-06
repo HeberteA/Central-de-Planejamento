@@ -387,7 +387,7 @@ def app(obra_id):
     user = st.session_state.get('user', {})
     is_admin = user.get('role') == 'admin'
     
-    st.markdown("# Longo Prazo(LOB)")
+    st.header("# Longo Prazo(LOB)", divider="orange")
     
     tabs_list = ["Visualização LOB"]
     if is_admin:
