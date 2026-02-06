@@ -120,7 +120,7 @@ def app(obra_id):
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("# Programação Semanal")
+    st.header("Programação Semanal", divider="orange")
 
     user = st.session_state['user']
     is_admin = user.get('role') == 'admin'
