@@ -210,7 +210,7 @@ def render_pull_board(df):
 
 
 def render_management(supabase, obra_id):
-    st.header("Gerenciar Pull Planning", divider="orange")
+    st.markdown("##### Gerenciar Pull Planning")
     
     c1, c2 = st.columns(2)
     
@@ -281,7 +281,7 @@ def render_management(supabase, obra_id):
                 st.rerun()
 
 def app(obra_id):
-    st.markdown("# Pull Planning")
+    st.header("Pull Planning", divider="orange")
     
     supabase = database.get_db_client()
     user = st.session_state.get('user', {})
