@@ -286,7 +286,7 @@ def render_management(supabase, obra_id):
                 st.rerun()
 
 def app(obra_id):
-    st.markdown("### Quadro de Restrições")
+    st.header("Restrições", divider="orange")
     
     supabase = database.get_db_client()
     user = st.session_state.get('user', {})
