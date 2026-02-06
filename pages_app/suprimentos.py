@@ -5,7 +5,7 @@ from modules import database
 from modules import ui
 
 def app(obra_id):
-    ui.header("Suprimentos")
+    ui.header("Suprimentos", divider="orange")
 
     supabase = database.get_db_client()
     user_role = st.session_state['user'].get('role', 'user')
