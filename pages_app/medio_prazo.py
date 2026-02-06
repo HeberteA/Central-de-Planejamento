@@ -114,7 +114,7 @@ def app(obra_id):
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("# Médio Prazo")
+    st.header("Médio Prazo", divider="orange")
 
     supabase = database.get_db_client()
 
