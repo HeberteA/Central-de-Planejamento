@@ -200,7 +200,7 @@ def render_boards(df, supabase):
                         """, unsafe_allow_html=True)
                     with c2:
                         st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("OK", key=f"ok_{row['id']}", help="Marcar como Resolvido"):
+                        if st.button("Concluir", key=f"ok_{row['id']}", help="Marcar como Resolvido"):
                             supabase.table("pcp_restricoes").update({
                                 "status": "Removida",
                                 "data_resolucao": datetime.now().strftime('%Y-%m-%d')
