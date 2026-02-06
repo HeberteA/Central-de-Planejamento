@@ -6,7 +6,6 @@ from modules import ui
 import time
 
 def get_mondays(start_date, num_weeks=12):
-    """Gera lista de segundas-feiras"""
     current = start_date - timedelta(days=start_date.weekday())
     weeks = []
     for _ in range(num_weeks):
@@ -55,8 +54,6 @@ def render_pull_board(df):
             overflow-x: auto;
             margin-bottom: 20px;
         }
-        
-        /* HEADER (LINHA SUPERIOR) */
         .board-header-row {
             display: flex;
             background-color: #1e1e1e;
@@ -97,8 +94,6 @@ def render_pull_board(df):
             color: #E37026;
             border-bottom: 3px solid #E37026;
         }
-
-        /* DATA ROW (LINHAS DE DADOS) */
         .board-data-row {
             display: flex;
             border-bottom: 1px solid #2a2a2a;
@@ -136,8 +131,6 @@ def render_pull_board(df):
         .row-cell-week:hover {
             background-color: #181818;
         }
-
-        /* CARDS */
         .pp-card {
             background-color: #262626;
             border-radius: 4px;
@@ -195,19 +188,18 @@ def render_pull_board(df):
                 
                 resp = row.get('responsavel', '') or ''
                 
-                html.append(f"""
-                <div class="pp-card" style="border-left-color: {color};" title="{row['atividade']}">
-                    <div style="font-weight:bold; margin-bottom:2px;">{row['atividade']}</div>
-                    <div style="color:#aaa; font-size:0.6rem;">{resp}</div>
-                </div>
-                """)
+                card_html = f'<div class="pp-card" style="border-left-color: {color};" title="{row["atividade"]}">'
+                card_html += f'<div style="font-weight:bold; margin-bottom:2px;">{row["atividade"]}</div>'
+                card_html += f'<div style="color:#aaa; font-size:0.6rem;">{resp}</div>'
+                card_html += '</div>'
+                
+                html.append(card_html)
                 
             html.append('</div>') 
         html.append('</div>') 
 
     html.append('</div>') 
     st.markdown("".join(html), unsafe_allow_html=True)
-
 
 def render_management(supabase, obra_id):
     st.markdown("##### Gerenciar Pull Planning")
