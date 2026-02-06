@@ -104,6 +104,27 @@ def card_kpi(label, value, suffix="", border_color="#E37026"):
     </div>
     """, unsafe_allow_html=True)
 
+def card(label, value, suffix="", border_color="#E37026"):
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(145deg, #1e1e1e, #252525);
+        padding: 15px; 
+        border-radius: 10px; 
+        border: 1px solid #333; 
+        border-bottom: 4px solid {border_color};
+        text-align: center; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        height: 100%;
+        min-height: 110px;
+        display: flex; flex-direction: column; justify-content: center;
+    ">
+        <div style="font-size: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">{label}</div>
+        <div style="font-size: 1.6rem; font-weight: 700; color: white;">{value}</div>
+            <span style="font-size: 0.9rem; color: {border_color}; margin-left: 2px;">{suffix}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 def plot_bar_week_grouped(df, x_col, y_col, color_col, title, color_seq, y_title="%"):
     fig = px.bar(
         df, x=x_col, y=y_col, 
@@ -188,14 +209,14 @@ def app(obra_id_param):
             if not top.empty:
                 count_ofensor = top.values[0]
                 maior_ofensor = top.index[0]
-                if len(maior_ofensor) > 12: maior_ofensor = maior_ofensor[:10] + "..."
+                if len(maior_ofensor) > 35: maior_ofensor = maior_ofensor[:32] + "..."
 
     with k1: card_kpi("PPC Medio", f"{avg_ppc:.0f}", "%", "#3B82F6")
     with k2: card_kpi("PAP Medio", f"{avg_pap:.0f}", "%", "#10B981")
     with k3: card_kpi("Restricoes Totais", f"{tot_restricoes}", "", "#EF4444")
     with k4: card_kpi("Total Removidas", f"{tot_removidas}", "", "#10B981")
     with k5: card_kpi("Saldo Restricoes", f"{saldo_aberto}", "", "#E37026")
-    with k6: card_kpi("Maior Ofensor", f"{count_ofensor}", f"\n{maior_ofensor}", "#E37026")
+    with k6: card("Maior Ofensor", f"{count_ofensor}", f"\n{maior_ofensor}", "#E37026")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
