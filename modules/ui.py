@@ -10,7 +10,7 @@ def inject_css():
 def header(titulo, subtitulo=None):
     st.markdown(f"""
         <div style="margin-bottom: 20px;">
-            <h1 style="margin-bottom: 0;">{titulo}</h1>
+            <h1 style="color: #FFFFFF; margin-bottom: 0;">{titulo}</h1>
             {f'<p style="color: #888; margin-top: 5px;">{subtitulo}</p>' if subtitulo else ''}
         </div>
     """, unsafe_allow_html=True)
