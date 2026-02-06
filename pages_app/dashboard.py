@@ -209,7 +209,7 @@ def app(obra_id_param):
             if not top.empty:
                 count_ofensor = top.values[0]
                 maior_ofensor = top.index[0]
-                if len(maior_ofensor) > 35: maior_ofensor = maior_ofensor[:32] + "..."
+                if len(maior_ofensor) > 50: maior_ofensor = maior_ofensor[:50] + "..."
 
     with k1: card_kpi("PPC Medio", f"{avg_ppc:.0f}", "%", "#3B82F6")
     with k2: card_kpi("PAP Medio", f"{avg_pap:.0f}", "%", "#10B981")
