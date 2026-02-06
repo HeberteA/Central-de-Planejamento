@@ -210,7 +210,7 @@ def render_pull_board(df):
 
 
 def render_management(supabase, obra_id):
-    st.markdown("##### Gerenciar Pull Planning")
+    st.header("Gerenciar Pull Planning", divider="orange")
     
     c1, c2 = st.columns(2)
     
