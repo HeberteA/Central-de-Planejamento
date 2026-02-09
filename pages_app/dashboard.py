@@ -220,7 +220,7 @@ def app(obra_id_param):
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    t1, t2, t3 = st.tabs(["Producao (PPC/PAP)", "Restricoes (Quantitativo)", "Problemas"])
+    t1, t2, t3 = st.tabs(["IND (PPC/PAP)", "Restricoes (IRR)", "Problemas"])
 
     with t1:
         st.markdown("##### Tendencia Mensal")
@@ -391,7 +391,7 @@ def app(obra_id_param):
                 
                 c_p1, c_p2 = st.columns([2, 1])
                 with c_p1:
-                    st.markdown("##### Causas (Quantitativo)")
+                    st.markdown("##### Causas")
                     fig_bar_p = px.bar(
                         df_group, x='quantidade', y=col_prob, orientation='h',
                         text_auto=True, color_discrete_sequence=[LAVIE_PALETTE[0]]
@@ -421,30 +421,27 @@ def app(obra_id_param):
                 st.markdown("---")
                 st.markdown("##### Analise Detalhada")
                 
-                n_p1, n_p2 = st.columns(2)
-                with n_p1:
-                    st.markdown("**Top 5 Problemas no Tempo**")
-                    top_5_probs = df_group.sort_values('quantidade', ascending=False).head(5)[col_prob].tolist()
-                    df_time_prob = df_prob[df_prob[col_prob].isin(top_5_probs)].groupby(['data', col_prob])['quantidade'].sum().reset_index()
-                    
-                    fig_line_prob = px.line(df_time_prob, x='data', y='quantidade', color=col_prob, color_discrete_sequence=LAVIE_PALETTE)
-                    fig_line_prob.update_layout(
-                        paper_bgcolor=BG_COLOR, plot_bgcolor=BG_COLOR, font_color=TEXT_COLOR,
-                        height=350, showlegend=True, legend=dict(orientation="h", y=-0.2)
-                    )
-                    st.plotly_chart(fig_line_prob, use_container_width=True)
-                    
-                with n_p2:
-                    st.markdown("**Mapa de Calor: Problema x Obra**")
-                    df_heat_prob = df_prob.groupby(['obra_nome', col_prob])['quantidade'].sum().reset_index()
-                    fig_heat_prob = px.density_heatmap(
-                        df_heat_prob, x='obra_nome', y=col_prob, z='quantidade',
-                        text_auto=True, color_continuous_scale=LAVIE_PALETTE
-                    )
-                    fig_heat_prob.update_layout(
-                        paper_bgcolor=BG_COLOR, plot_bgcolor=BG_COLOR, font_color=TEXT_COLOR, height=350
-                    )
-                    st.plotly_chart(fig_heat_prob, use_container_width=True)
+                st.markdown("**Top 5 Problemas no Tempo**")
+                top_5_probs = df_group.sort_values('quantidade', ascending=False).head(5)[col_prob].tolist()
+                df_time_prob = df_prob[df_prob[col_prob].isin(top_5_probs)].groupby(['data', col_prob])['quantidade'].sum().reset_index()
+                
+                fig_line_prob = px.line(df_time_prob, x='data', y='quantidade', color=col_prob, color_discrete_sequence=LAVIE_PALETTE)
+                fig_line_prob.update_layout(
+                    paper_bgcolor=BG_COLOR, plot_bgcolor=BG_COLOR, font_color=TEXT_COLOR,
+                    height=350, showlegend=True, legend=dict(orientation="h", y=-0.2)
+                )
+                st.plotly_chart(fig_line_prob, use_container_width=True)
+                
+                st.markdown("**Mapa de Calor: Problema x Obra**")
+                df_heat_prob = df_prob.groupby(['obra_nome', col_prob])['quantidade'].sum().reset_index()
+                fig_heat_prob = px.density_heatmap(
+                    df_heat_prob, x='obra_nome', y=col_prob, z='quantidade',
+                    text_auto=True, color_continuous_scale=LAVIE_PALETTE
+                )
+                fig_heat_prob.update_layout(
+                    paper_bgcolor=BG_COLOR, plot_bgcolor=BG_COLOR, font_color=TEXT_COLOR, height=350
+                )
+                st.plotly_chart(fig_heat_prob, use_container_width=True)
 
             else:
                 st.error("Erro na coluna de dados.")
