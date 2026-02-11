@@ -452,44 +452,7 @@ def app(obra_id):
                     supabase.table("pcp_programacao_semanal").delete().eq("id", row['id']).execute()
                     st.rerun()
                     
-            st.markdown('<div style="margin-top: 5px; border-top: 1px solid #333; padding-top: 10px;">', unsafe_allow_html=True)
-            c_btn1, c_btn2 = st.columns([2, 1])
-            
-            with c_btn1:
-                if st.button("Salvar", key=f"save_{row['id']}", use_container_width=True):
-                    up_data = {"status": st.session_state[f"st_{row['id']}"]}
-                    if txt_seg is not None: 
-                        up_data["rec_seg"] = txt_seg
-                        up_data["feito_seg"] = chk_seg
-                    if txt_ter is not None: 
-                        up_data["rec_ter"] = txt_ter
-                        up_data["feito_ter"] = chk_ter
-                    if txt_qua is not None: 
-                        up_data["rec_qua"] = txt_qua
-                        up_data["feito_qua"] = chk_qua
-                    if txt_qui is not None: 
-                        up_data["rec_qui"] = txt_qui
-                        up_data["feito_qui"] = chk_qui
-                    if txt_sex is not None: 
-                        up_data["rec_sex"] = txt_sex
-                        up_data["feito_sex"] = chk_sex
-
-                    if st.session_state[f"st_{row['id']}"] == "Nao Concluido":
-                        causa_val = st.session_state.get(f"causa_{row['id']}")
-                        if causa_val: up_data['causa'] = causa_val
-                    else:
-                        up_data['causa'] = None
-
-                    supabase.table("pcp_programacao_semanal").update(up_data).eq("id", row['id']).execute()
-                    st.toast("Salvo!", icon="✅")
-                    st.rerun()
-
-            with c_btn2:
-                if st.button("Excluir", key=f"del_{row['id']}", type="primary", use_container_width=True):
-                    supabase.table("pcp_programacao_semanal").delete().eq("id", row['id']).execute()
-                    st.rerun()
-
-            st.markdown("</div></div>", unsafe_allow_html=True)
+            s
 
     st.markdown("---")
     st.markdown("##### Fechamento da Semana")
