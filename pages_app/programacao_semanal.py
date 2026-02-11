@@ -451,9 +451,7 @@ def app(obra_id):
                 if st.button("Excluir", key=f"del_{row['id']}", type="primary", use_container_width=True):
                     supabase.table("pcp_programacao_semanal").delete().eq("id", row['id']).execute()
                     st.rerun()
-                    
-            s
-
+                  
     st.markdown("---")
     st.markdown("##### Fechamento da Semana")
     
