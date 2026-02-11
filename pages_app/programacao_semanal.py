@@ -342,7 +342,7 @@ def app(obra_id):
                     "Conclusão (%):", 
                     min_value=0, 
                     max_value=100, 
-                    value=float(db_perc),
+                    value=int(db_perc),
                     step=5,
                     key=f"perc_{row['id']}"
                 )
