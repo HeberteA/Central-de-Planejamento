@@ -340,10 +340,10 @@ def app(obra_id):
                 
                 st.number_input(
                     "Conclusão (%):", 
-                    min_value=0.0, 
-                    max_value=100.0, 
+                    min_value=0, 
+                    max_value=100, 
                     value=float(db_perc),
-                    step=5.0,
+                    step=5,
                     key=f"perc_{row['id']}"
                 )
 
