@@ -228,11 +228,11 @@ def app(obra_id):
         .eq("obra_id", obra_id)\
         .eq("data_inicio_semana", start_week.strftime('%Y-%m-%d'))\
         .order("local", desc=False).execute()
-    
+ 
     df = pd.DataFrame(response.data)
 
     total_atividades = 0
-    total_concluidas = 0
+    total_pontos_ppc = 0 
     total_dias_programados = 0
     total_dias_executados = 0
     ppc_percent = 0.0
@@ -240,12 +240,18 @@ def app(obra_id):
 
     if not df.empty and 'status' in df.columns:
         total_atividades = len(df)
-        total_concluidas = len(df[df['status'] == 'Concluido'])
-        
-        if total_atividades > 0:
-            ppc_percent = (total_concluidas / total_atividades) * 100
         
         for idx, row in df.iterrows():
+            if row['status'] == 'Concluido':
+                total_pontos_ppc += 1.0
+            elif row['status'] == 'Em Andamento':
+                perc = row.get('percentual', 0)
+                try:
+                    val_perc = float(perc) if perc else 0.0
+                except:
+                    val_perc = 0.0
+                total_pontos_ppc += (val_perc / 100.0)
+            
             for dia in ['seg', 'ter', 'qua', 'qui', 'sex']:
                 rec_val = row.get(f'rec_{dia}')
                 feito_val = row.get(f'feito_{dia}')
@@ -255,13 +261,17 @@ def app(obra_id):
                     if feito_val is True:
                         total_dias_executados += 1
         
+        if total_atividades > 0:
+            ppc_percent = (total_pontos_ppc / total_atividades) * 100
+            
         if total_dias_programados > 0:
             pap_percent = (total_dias_executados / total_dias_programados) * 100
     else:
         df = pd.DataFrame(columns=['id', 'status', 'local', 'atividade', 'detalhe', 'encarregado', 
                                    'rec_seg', 'feito_seg', 'rec_ter', 'feito_ter', 
                                    'rec_qua', 'feito_qua', 'rec_qui', 'feito_qui', 
-                                   'rec_sex', 'feito_sex', 'causa'])
+                                   'rec_sex', 'feito_sex', 'causa', 'percentual', 'observacao'])
+
 
     st.markdown(f"""
     <div class="kpi-container">
@@ -323,20 +333,45 @@ def app(obra_id):
 
             selected_causa = row.get('causa') 
             
-            if new_status == "Nao Concluido":
+            if new_status == "Em Andamento":
+                db_perc = row.get('percentual', 0.0)
+                if pd.isna(db_perc): db_perc = 0.0
+                
+                st.number_input(
+                    "Conclusão (%):", 
+                    min_value=0.0, 
+                    max_value=100.0, 
+                    value=float(db_perc),
+                    step=5.0,
+                    key=f"perc_{row['id']}"
+                )
+
+            if new_status in ["Nao Concluido", "Em Andamento"]:
+                selected_causa = row.get('causa') 
                 idx_causa = None
+                
                 if selected_causa and selected_causa in lista_problemas:
                     idx_causa = lista_problemas.index(selected_causa)
                 
-                new_causa = st.selectbox(
-                    "Motivo:",
+                st.selectbox(
+                    "Motivo / Problema:",
                     lista_problemas,
                     index=idx_causa,
                     key=f"causa_{row['id']}",
-                    placeholder="Selecione..."
+                    placeholder="Selecione o problema..."
                 )
-            else:
-                new_causa = None
+
+            if new_status in ["Em Andamento", "Nao Concluido"]:
+                db_obs = row.get('observacao', '')
+                if pd.isna(db_obs): db_obs = ""
+                
+                st.text_area(
+                    "Observação:",
+                    value=db_obs,
+                    key=f"obs_{row['id']}",
+                    height=68,
+                    placeholder="Descreva detalhes..."
+                )
 
             st.markdown('<div style="margin: 5px 0;"></div>', unsafe_allow_html=True)
             
@@ -360,6 +395,62 @@ def app(obra_id):
             chk_qui, txt_qui = day_widget(d4, "QUI", row['rec_qui'], row['feito_qui'], row['id'])
             chk_sex, txt_sex = day_widget(d5, "SEX", row['rec_sex'], row['feito_sex'], row['id'])
 
+            st.markdown('<div style="margin-top: 5px; border-top: 1px solid #333; padding-top: 10px;">', unsafe_allow_html=True)
+            
+            c_btn1, c_btn2 = st.columns([2, 1])
+            
+            with c_btn1:
+                if st.button("Salvar", key=f"save_{row['id']}", use_container_width=True):
+                    status_atual = st.session_state[f"st_{row['id']}"]
+                    up_data = {"status": status_atual}
+                    
+                    if txt_seg is not None: 
+                        up_data["rec_seg"] = txt_seg
+                        up_data["feito_seg"] = chk_seg
+                    if txt_ter is not None: 
+                        up_data["rec_ter"] = txt_ter
+                        up_data["feito_ter"] = chk_ter
+                    if txt_qua is not None: 
+                        up_data["rec_qua"] = txt_qua
+                        up_data["feito_qua"] = chk_qua
+                    if txt_qui is not None: 
+                        up_data["rec_qui"] = txt_qui
+                        up_data["feito_qui"] = chk_qui
+                    if txt_sex is not None: 
+                        up_data["rec_sex"] = txt_sex
+                        up_data["feito_sex"] = chk_sex
+
+                    if status_atual in ["Nao Concluido", "Em Andamento"]:
+                        causa_val = st.session_state.get(f"causa_{row['id']}")
+                        up_data['causa'] = causa_val
+                    else:
+                        up_data['causa'] = None
+                    if status_atual == "Em Andamento":
+                        perc_val = st.session_state.get(f"perc_{row['id']}")
+                        up_data['percentual'] = perc_val
+                    elif status_atual == "Concluido":
+                        up_data['percentual'] = 100.0
+                    else:
+                        up_data['percentual'] = 0.0
+                    if status_atual in ["Em Andamento", "Nao Concluido"]:
+                        obs_val = st.session_state.get(f"obs_{row['id']}")
+                        up_data['observacao'] = obs_val
+                    else:
+                        up_data['observacao'] = None
+
+                    try:
+                        supabase.table("pcp_programacao_semanal").update(up_data).eq("id", row['id']).execute()
+                        st.toast("Salvo!", icon="✅")
+                        time.sleep(0.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
+
+            with c_btn2:
+                if st.button("Excluir", key=f"del_{row['id']}", type="primary", use_container_width=True):
+                    supabase.table("pcp_programacao_semanal").delete().eq("id", row['id']).execute()
+                    st.rerun()
+                    
             st.markdown('<div style="margin-top: 5px; border-top: 1px solid #333; padding-top: 10px;">', unsafe_allow_html=True)
             c_btn1, c_btn2 = st.columns([2, 1])
             
