@@ -233,6 +233,7 @@ def app(obra_id):
 
     total_atividades = 0
     total_pontos_ppc = 0 
+    total_concluidas = 0
     total_dias_programados = 0
     total_dias_executados = 0
     ppc_percent = 0.0
