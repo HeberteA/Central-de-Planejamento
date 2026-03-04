@@ -62,15 +62,17 @@ def app(obra_id):
             df_ativ = pd.DataFrame(resp_ativ.data)
             
             if not df_ativ.empty:
-                st.markdown(f"""
-                <div class="task-card" style="border-left-color: #3B82F6;">
-                    <div class="card-header-text">{row['atividade']}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                for idx, row in df_ativ.iterrows():
                 
-                if st.button("Excluir", key=f"del_atv_{row['id']}", use_container_width=True):
-                    supabase.table("pcp_atividades_padrao").delete().eq("id", row['id']).execute()
-                    st.rerun()
+                    st.markdown(f"""
+                    <div class="task-card" style="border-left-color: #3B82F6;">
+                        <div class="card-header-text">{row['atividade']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if st.button("Excluir", key=f"del_atv_{row['id']}", use_container_width=True):
+                        supabase.table("pcp_atividades_padrao").delete().eq("id", row['id']).execute()
+                        st.rerun()
             else:
                 st.info("Nenhuma atividade padrao cadastrada.")
         except Exception as e:
@@ -110,16 +112,19 @@ def app(obra_id):
             df_loc = pd.DataFrame(resp_loc.data)
             
             if not df_loc.empty:
-                st.markdown(f"""
-                <div class="task-card" style="border-left-color: #E37026;">
-                    <div style="color: #aaa; font-size: 0.8rem;">Ordem: {row['ordem']}</div>
-                    <div class="card-header-text">{row['nome']}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button("Excluir", key=f"del_loc_{row['id']}", use_container_width=True):
-                    supabase.table("pcp_locais").delete().eq("id", row['id']).execute()
-                    st.rerun()
+            
+                for idx, row in df_loc.iterrows():
+                    
+                    st.markdown(f"""
+                    <div class="task-card" style="border-left-color: #E37026;">
+                        <div style="color: #aaa; font-size: 0.8rem;">Ordem: {row['ordem']}</div>
+                        <div class="card-header-text">{row['nome']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if st.button("Excluir", key=f"del_loc_{row['id']}", use_container_width=True):
+                        supabase.table("pcp_locais").delete().eq("id", row['id']).execute()
+                        st.rerun()
             else:
                 st.info("Nenhum local cadastrado para esta obra.")
         except Exception as e:
@@ -159,15 +164,17 @@ def app(obra_id):
                     df_prob = df_prob[df_prob['descricao'].str.contains(busca_prob, case=False, na=False)]
                 
                 if not df_prob.empty:
-                    st.markdown(f"""
-                    <div class="task-card" style="border-left-color: #EF4444;">
-                        <div class="card-header-text">{row['descricao']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button("Excluir", key=f"del_prob_{row['id']}", use_container_width=True):
-                        supabase.table("pcp_lista_problemas").delete().eq("id", row['id']).execute()
-                        st.rerun()
+                    for idx, row in df_prob.iterrows():
+                        
+                        st.markdown(f"""
+                        <div class="task-card" style="border-left-color: #EF4444;">
+                            <div class="card-header-text">{row['descricao']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if st.button("Excluir", key=f"del_prob_{row['id']}", use_container_width=True):
+                            supabase.table("pcp_lista_problemas").delete().eq("id", row['id']).execute()
+                            st.rerun()
                 else:
                     st.info("Nenhum problema encontrado na pesquisa.")
             else:
