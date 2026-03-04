@@ -1,229 +1,188 @@
 import streamlit as st
 import pandas as pd
-from modules import database
-from modules import ui
 import time
-
-def render_pavimentos(supabase, obra_id):
-    st.markdown("""
-    <style>
-        .pav-card {
-            background-color: #262626;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-left: 4px solid #E37026;
-            transition: transform 0.2s;
-        }
-        .pav-card:hover { transform: translateX(5px); background-color: #333; }
-        .pav-info { display: flex; align-items: center; gap: 15px; }
-        .pav-ordem { 
-            background: #444; color: white; 
-            width: 30px; height: 30px; 
-            border-radius: 50%; 
-            display: flex; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 0.9rem;
-        }
-        .pav-nome { font-size: 1rem; font-weight: 500; color: #eee; }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    with st.expander("Adicionar Pavimento", expanded=False):
-        c_form = st.container()
-        c1, c2 = c_form.columns([3, 1])
-        novo_nome = c1.text_input("Nome do Pavimento")
-        nova_ordem = c2.number_input("Ordem", value=0, step=1)
-        
-        if c_form.button("Salvar Pavimento", type="primary"):
-            if novo_nome:
-                try:
-                    supabase.table("pcp_locais").insert({
-                        "obra_id": obra_id, "nome": novo_nome.upper(), "ordem": nova_ordem, "tipo": "Pavimento"
-                    }).execute()
-                    st.success("Salvo!")
-                    time.sleep(0.5)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro: {e}")
-
-    try:
-        resp = supabase.table("pcp_locais").select("*").eq("obra_id", obra_id).order("ordem", desc=True).execute()
-        locais = resp.data
-        
-        if not locais:
-            st.info("Nenhum pavimento cadastrado.")
-        
-        for loc in locais:
-            c_card = st.container()
-            col_a, col_b = c_card.columns([5, 1])
-            
-            with col_a:
-                st.markdown(f"""
-                <div class="pav-card">
-                    <div class="pav-info">
-                        <div class="pav-ordem">{loc['ordem']}</div>
-                        <div class="pav-nome">{loc['nome']}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col_b:
-                st.markdown("")
-                if st.button("Excluir", key=f"del_pav_{loc['id']}", help="Excluir Pavimento"):
-                    supabase.table("pcp_locais").delete().eq("id", loc['id']).execute()
-                    st.rerun()
-                    
-    except Exception as e:
-        st.error(f"Erro ao carregar: {e}")
-
-def render_atividades_padrao(supabase):
-    st.markdown("""
-    <style>
-        .atv-tag {
-            display: inline-flex;
-            align-items: center;
-            background: #1E1E1E;
-            border: 1px solid #333;
-            border-radius: 20px;
-            padding: 8px 16px;
-            margin: 5px;
-            color: #ddd;
-            font-size: 0.9rem;
-        }
-        .atv-icon { margin-right: 8px; color: #E37026; }
-    </style>
-    """, unsafe_allow_html=True)
-
-    with st.expander("Nova Atividade", expanded=False):
-        c_add = st.container()
-        nova_atv = c_add.text_input("Nome da Atividade")
-        if c_add.button("Cadastrar Atividades", use_container_width=True):
-            if nova_atv:
-                try:
-                    supabase.table("pcp_atividades_padrao").insert({"atividade": nova_atv.upper().strip()}).execute()
-                    st.success("Cadastrada!")
-                    time.sleep(0.5)
-                    st.rerun()
-                except Exception as e:
-                    err_msg = str(e)
-                    st.error(f"Erro retornado pelo banco: {err_msg}")
-
-    try:
-        resp = supabase.table("pcp_atividades_padrao").select("*").order("atividade").execute()
-        atvs = resp.data
-    
-        
-        if not atvs:
-            st.info("Nenhuma atividade padrão.")
-            
-        for atv in atvs:
-            c1, c2 = st.columns([6, 1])
-            with c1:
-                st.markdown(f"""
-                <div class="atv-tag">
-                    <span class="atv-icon">●</span>
-                    {atv['atividade']}
-                </div>
-                """, unsafe_allow_html=True)
-            with c2:
-                if st.button("Excluir", key=f"del_atv_{atv['id']}"):
-                    supabase.table("pcp_atividades_padrao").delete().eq("id", atv['id']).execute()
-                    st.rerun()
-                    
-    except Exception as e:
-        st.error(f"Erro: {e}")
-
-def render_gestao_obras(supabase):
-    st.markdown("##### Gestão de Obras")
-    
-    with st.expander("Cadastrar Nova Obra", expanded=False):
-        c_form = st.container()
-        nome_obra = c_form.text_input("Nome da Obra")
-        senha_inicial = c_form.text_input("Senha Inicial", value="1234")
-        
-        c_mod1, c_mod2 = c_form.columns(2)
-        ini_lob = c_mod1.checkbox("Ativar LOB?", value=True)
-        ini_pull = c_mod2.checkbox("Ativar Pull Planning?", value=True)
-        
-        if c_form.button("Criar Nova Obra", type="primary"):
-            if nome_obra:
-                supabase.table("pcp_obras").insert({
-                    "nome": nome_obra.upper(),
-                    "senha_acesso": senha_inicial,
-                    "ativa": True,
-                    "usa_lob": ini_lob,
-                    "usa_pull": ini_pull
-                }).execute()
-                st.success("Obra criada!")
-                time.sleep(1)
-                st.rerun()
-
-    st.markdown("---")
-    
-    try:
-        resp = supabase.table("pcp_obras").select("*").order("nome").execute()
-        obras = resp.data
-        
-        for obra in obras:
-            status_txt = "ATIVA" if obra.get('ativa', True) else "INATIVA"
-            
-            with st.expander(f"{obra['nome']} ({status_txt})", expanded=False):
-                c_edit = st.container()
-                
-                c1, c2 = c_edit.columns(2)
-                nova_senha = c1.text_input("Senha de Acesso", value=obra.get('senha_acesso', ''), key=f"pw_{obra['id']}")
-                is_ativa = c2.toggle("Obra Ativa?", value=obra.get('ativa', True), key=f"at_{obra['id']}")
-                
-                st.markdown("###### Módulos")
-                c3, c4 = c_edit.columns(2)
-                use_lob = c3.toggle("Utiliza Longo Prazo (LOB)?", value=obra.get('usa_lob', True), key=f"lob_{obra['id']}")
-                use_pull = c4.toggle("Utiliza Pull Planning?", value=obra.get('usa_pull', True), key=f"pull_{obra['id']}")
-                
-                st.markdown("<br>", unsafe_allow_html=True)
-                
-                if c_edit.button("Salvar Alterações", key=f"upd_{obra['id']}", type="primary"):
-                    supabase.table("pcp_obras").update({
-                        "senha_acesso": nova_senha,
-                        "ativa": is_ativa,
-                        "usa_lob": use_lob,
-                        "usa_pull": use_pull
-                    }).eq("id", obra['id']).execute()
-                    st.toast("Dados atualizados!")
-                    time.sleep(0.5)
-                    st.rerun()
-                    
-    except Exception as e:
-        st.error(f"Erro ao listar obras: {e}")
+from modules import database
 
 def app(obra_id):
+    st.markdown("""
+    <style>
+        .task-card {
+            background-color: #1E1E1E;
+            border: 1px solid #333;
+            border-left-width: 6px;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+        }
+        .task-card:hover {
+            border-color: #555;
+            transform: translateY(-2px);
+        }
+        .card-header-text {
+            color: #fff;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.header("Configuracoes da Obra", divider="orange")
+
     supabase = database.get_db_client()
-    user = st.session_state.get('user', {})
-    is_admin = user.get('role') == 'admin'
-    
-    st.markdown("# Configurações")
-    
-    tabs_list = []
-    
-    if is_admin:
-        tabs_list.append("Gestão de Obras")
+
+    tab1, tab2, tab3 = st.tabs(["Atividades Padrao", "Locais", "Problemas"])
+
+    with tab1:
+        st.markdown("### Gerenciar Atividades Padrao")
         
-    tabs_list.extend(["Pavimentos", "Atividades Padrão"])
-    
-    tabs = st.tabs(tabs_list)
-    
-    current_tab = 0
-    
-    if is_admin:
-        with tabs[current_tab]:
-            render_gestao_obras(supabase)
-        current_tab += 1
+        with st.expander("Nova Atividade", expanded=False):
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                nova_ativ = st.text_input("Nome da Atividade Padrao")
+            with c2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("Adicionar", key="btn_add_ativ", type="primary", use_container_width=True):
+                    if nova_ativ:
+                        try:
+                            supabase.table("pcp_atividades_padrao").insert({"atividade": str(nova_ativ).upper()}).execute()
+                            st.toast("Adicionado com sucesso!")
+                            time.sleep(0.5)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
+                    else:
+                        st.warning("Preencha o nome da atividade.")
+
+        st.markdown("---")
         
-    with tabs[current_tab]:
-        render_pavimentos(supabase, obra_id)
-    current_tab += 1
+        try:
+            resp_ativ = supabase.table("pcp_atividades_padrao").select("*").order("atividade").execute()
+            df_ativ = pd.DataFrame(resp_ativ.data)
+            
+            if not df_ativ.empty:
+                cols_a = st.columns(3)
+                for idx, row in df_ativ.iterrows():
+                    col_atual = cols_a[idx % 3]
+                    with col_atual:
+                        st.markdown(f"""
+                        <div class="task-card" style="border-left-color: #3B82F6;">
+                            <div class="card-header-text">{row['atividade']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if st.button("Excluir", key=f"del_atv_{row['id']}", use_container_width=True):
+                            supabase.table("pcp_atividades_padrao").delete().eq("id", row['id']).execute()
+                            st.rerun()
+            else:
+                st.info("Nenhuma atividade padrao cadastrada.")
+        except Exception as e:
+            st.error(f"Erro ao carregar atividades: {e}")
+
+    with tab2:
+        st.markdown("### Gerenciar Locais da Obra")
         
-    with tabs[current_tab]:
-        render_atividades_padrao(supabase)
+        with st.expander("Novo Local", expanded=False):
+            c1, c2, c3 = st.columns([3, 1, 1])
+            with c1:
+                novo_local = st.text_input("Nome do Local")
+            with c2:
+                nova_ordem = st.number_input("Ordem", min_value=1, value=1)
+            with c3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("Adicionar", key="btn_add_loc", type="primary", use_container_width=True):
+                    if novo_local:
+                        try:
+                            supabase.table("pcp_locais").insert({
+                                "obra_id": obra_id,
+                                "nome": str(novo_local).upper(),
+                                "ordem": nova_ordem
+                            }).execute()
+                            st.toast("Adicionado com sucesso!")
+                            time.sleep(0.5)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
+                    else:
+                        st.warning("Preencha o nome do local.")
+
+        st.markdown("---")
+        
+        try:
+            resp_loc = supabase.table("pcp_locais").select("*").eq("obra_id", obra_id).order("ordem").execute()
+            df_loc = pd.DataFrame(resp_loc.data)
+            
+            if not df_loc.empty:
+                cols_l = st.columns(3)
+                for idx, row in df_loc.iterrows():
+                    col_atual = cols_l[idx % 3]
+                    with col_atual:
+                        st.markdown(f"""
+                        <div class="task-card" style="border-left-color: #E37026;">
+                            <div style="color: #aaa; font-size: 0.8rem;">Ordem: {row['ordem']}</div>
+                            <div class="card-header-text">{row['nome']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if st.button("Excluir", key=f"del_loc_{row['id']}", use_container_width=True):
+                            supabase.table("pcp_locais").delete().eq("id", row['id']).execute()
+                            st.rerun()
+            else:
+                st.info("Nenhum local cadastrado para esta obra.")
+        except Exception as e:
+            st.error(f"Erro ao carregar locais: {e}")
+
+    with tab3:
+        st.markdown("### Gerenciar Problemas Padrao")
+        
+        with st.expander("Novo Problema", expanded=False):
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                novo_prob = st.text_input("Nome do Problema", key="input_novo_prob")
+            with c2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("Adicionar", key="btn_add_prob", type="primary", use_container_width=True):
+                    if novo_prob:
+                        try:
+                            supabase.table("pcp_lista_problemas").insert({"problema": str(novo_prob).upper()}).execute()
+                            st.toast("Adicionado com sucesso!")
+                            time.sleep(0.5)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
+                    else:
+                        st.warning("Preencha o nome do problema.")
+
+        st.markdown("---")
+        
+        busca_prob = st.text_input("Pesquisar problema...", key="busca_prob")
+        
+        try:
+            resp_prob = supabase.table("pcp_lista_problemas").select("*").order("problema").execute()
+            df_prob = pd.DataFrame(resp_prob.data)
+            
+            if not df_prob.empty:
+                if busca_prob:
+                    df_prob = df_prob[df_prob['problema'].str.contains(busca_prob, case=False, na=False)]
+                
+                if not df_prob.empty:
+                    cols_p = st.columns(3)
+                    for idx, row in df_prob.iterrows():
+                        col_atual = cols_p[idx % 3]
+                        with col_atual:
+                            st.markdown(f"""
+                            <div class="task-card" style="border-left-color: #EF4444;">
+                                <div class="card-header-text">{row['problema']}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            if st.button("Excluir", key=f"del_prob_{row['id']}", use_container_width=True):
+                                supabase.table("pcp_lista_problemas").delete().eq("id", row['id']).execute()
+                                st.rerun()
+                else:
+                    st.info("Nenhum problema encontrado na pesquisa.")
+            else:
+                st.info("Nenhum problema cadastrado.")
+        except Exception as e:
+            st.error(f"Erro ao carregar problemas: {e}")
