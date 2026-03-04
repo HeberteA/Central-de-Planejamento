@@ -340,10 +340,10 @@ def app(obra_id):
         st.info("Nenhuma atividade programada para esta semana.")
         return
 
-    cols = st.columns(3)
+    cols = st.columns(2)
     
     for idx, row in df.iterrows():
-        col_atual = cols[idx % 3]
+        col_atual = cols[idx % 2]
         with st.container():
             with col_atual:
                 status_color = "#888" 
