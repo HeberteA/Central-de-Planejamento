@@ -158,6 +158,48 @@ def app(obra_id):
             lista_problemas.sort()
     except: pass
 
+    @st.dialog("Editar Atividade")
+    def dialog_editar_atividade(row_data, locais_disp, ativ_disp):
+        st.write("Altere as informações da atividade:")
+        
+        if locais_disp:
+            idx_l = locais_disp.index(row_data['local']) if row_data['local'] in locais_disp else 0
+            val_local = st.selectbox("Local", locais_disp, index=idx_l, key=f"ed_loc_{row_data['id']}")
+        else:
+            val_local = st.text_input("Local", value=row_data['local'], key=f"ed_loc_{row_data['id']}")
+
+        if ativ_disp:
+            idx_a = ativ_disp.index(row_data['atividade']) if row_data['atividade'] in ativ_disp else 0
+            val_ativ = st.selectbox("Atividade", ativ_disp, index=idx_a, key=f"ed_atv_{row_data['id']}")
+        else:
+            val_ativ = st.text_input("Atividade", value=row_data['atividade'], key=f"ed_atv_{row_data['id']}")
+        
+        val_detalhe = st.text_input("Detalhe / Recurso", value=row_data['detalhe'] if pd.notna(row_data['detalhe']) else "", key=f"ed_det_{row_data['id']}")
+        val_equipe = st.text_input("Equipe / Encarregado", value=row_data['encarregado'] if pd.notna(row_data['encarregado']) else "", key=f"ed_eq_{row_data['id']}")
+        
+        st.markdown("---")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Salvar", use_container_width=True):
+                dados_update = {
+                    "local": str(val_local).upper(),
+                    "atividade": str(val_ativ).upper(),
+                    "detalhe": str(val_detalhe).upper(),
+                    "encarregado": str(val_equipe).upper()
+                }
+                supabase.table("pcp_programacao_semanal").update(dados_update).eq("id", row_data['id']).execute()
+                st.toast("Atividade atualizada!", icon="✅")
+                time.sleep(0.5)
+                st.rerun()
+                
+        with c2:
+            if st.button("Excluir", type="primary", use_container_width=True):
+                supabase.table("pcp_programacao_semanal").delete().eq("id", row_data['id']).execute()
+                st.toast("Atividade excluída!", icon="🗑️")
+                time.sleep(0.5)
+                st.rerun()
+
     with st.expander("Nova Atividade", expanded=False):
         c_top = st.container()
         
@@ -448,9 +490,8 @@ def app(obra_id):
                             st.error(f"Erro: {e}")
     
                 with c_btn2:
-                    if st.button("Excluir", key=f"del_{row['id']}", type="primary", use_container_width=True):
-                        supabase.table("pcp_programacao_semanal").delete().eq("id", row['id']).execute()
-                        st.rerun()
+                    if st.button("Editar", key=f"edit_{row['id']}", use_container_width=True):
+                        dialog_editar_atividade(row, lista_locais, lista_atividades)
                       
     st.markdown("---")
     st.markdown("##### Fechamento da Semana")
