@@ -62,19 +62,15 @@ def app(obra_id):
             df_ativ = pd.DataFrame(resp_ativ.data)
             
             if not df_ativ.empty:
-                cols_a = st.columns(3)
-                for idx, row in df_ativ.iterrows():
-                    col_atual = cols_a[idx % 3]
-                    with col_atual:
-                        st.markdown(f"""
-                        <div class="task-card" style="border-left-color: #3B82F6;">
-                            <div class="card-header-text">{row['atividade']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        if st.button("Excluir", key=f"del_atv_{row['id']}", use_container_width=True):
-                            supabase.table("pcp_atividades_padrao").delete().eq("id", row['id']).execute()
-                            st.rerun()
+                st.markdown(f"""
+                <div class="task-card" style="border-left-color: #3B82F6;">
+                    <div class="card-header-text">{row['atividade']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button("Excluir", key=f"del_atv_{row['id']}", use_container_width=True):
+                    supabase.table("pcp_atividades_padrao").delete().eq("id", row['id']).execute()
+                    st.rerun()
             else:
                 st.info("Nenhuma atividade padrao cadastrada.")
         except Exception as e:
@@ -114,20 +110,16 @@ def app(obra_id):
             df_loc = pd.DataFrame(resp_loc.data)
             
             if not df_loc.empty:
-                cols_l = st.columns(3)
-                for idx, row in df_loc.iterrows():
-                    col_atual = cols_l[idx % 3]
-                    with col_atual:
-                        st.markdown(f"""
-                        <div class="task-card" style="border-left-color: #E37026;">
-                            <div style="color: #aaa; font-size: 0.8rem;">Ordem: {row['ordem']}</div>
-                            <div class="card-header-text">{row['nome']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        if st.button("Excluir", key=f"del_loc_{row['id']}", use_container_width=True):
-                            supabase.table("pcp_locais").delete().eq("id", row['id']).execute()
-                            st.rerun()
+                st.markdown(f"""
+                <div class="task-card" style="border-left-color: #E37026;">
+                    <div style="color: #aaa; font-size: 0.8rem;">Ordem: {row['ordem']}</div>
+                    <div class="card-header-text">{row['nome']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button("Excluir", key=f"del_loc_{row['id']}", use_container_width=True):
+                    supabase.table("pcp_locais").delete().eq("id", row['id']).execute()
+                    st.rerun()
             else:
                 st.info("Nenhum local cadastrado para esta obra.")
         except Exception as e:
@@ -145,7 +137,7 @@ def app(obra_id):
                 if st.button("Adicionar", key="btn_add_prob", type="primary", use_container_width=True):
                     if novo_prob:
                         try:
-                            supabase.table("pcp_lista_problemas").insert({"problema": str(novo_prob).upper()}).execute()
+                            supabase.table("pcp_lista_problemas").insert({"descricao": str(novo_prob).upper()}).execute()
                             st.toast("Adicionado com sucesso!")
                             time.sleep(0.5)
                             st.rerun()
@@ -159,27 +151,23 @@ def app(obra_id):
         busca_prob = st.text_input("Pesquisar problema...", key="busca_prob")
         
         try:
-            resp_prob = supabase.table("pcp_lista_problemas").select("*").order("problema").execute()
+            resp_prob = supabase.table("pcp_lista_problemas").select("*").order("descricao").execute()
             df_prob = pd.DataFrame(resp_prob.data)
             
             if not df_prob.empty:
                 if busca_prob:
-                    df_prob = df_prob[df_prob['problema'].str.contains(busca_prob, case=False, na=False)]
+                    df_prob = df_prob[df_prob['descricao'].str.contains(busca_prob, case=False, na=False)]
                 
                 if not df_prob.empty:
-                    cols_p = st.columns(3)
-                    for idx, row in df_prob.iterrows():
-                        col_atual = cols_p[idx % 3]
-                        with col_atual:
-                            st.markdown(f"""
-                            <div class="task-card" style="border-left-color: #EF4444;">
-                                <div class="card-header-text">{row['problema']}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            if st.button("Excluir", key=f"del_prob_{row['id']}", use_container_width=True):
-                                supabase.table("pcp_lista_problemas").delete().eq("id", row['id']).execute()
-                                st.rerun()
+                    st.markdown(f"""
+                    <div class="task-card" style="border-left-color: #EF4444;">
+                        <div class="card-header-text">{row['descricao']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if st.button("Excluir", key=f"del_prob_{row['id']}", use_container_width=True):
+                        supabase.table("pcp_lista_problemas").delete().eq("id", row['id']).execute()
+                        st.rerun()
                 else:
                     st.info("Nenhum problema encontrado na pesquisa.")
             else:
