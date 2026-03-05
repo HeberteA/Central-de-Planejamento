@@ -88,6 +88,8 @@ def get_base64_image(image_path):
         return base64.b64encode(img_file.read()).decode()
 
 def gerar_pdf_semanal(data_ref_str):
+    import numpy as np
+    
     supabase = database.get_db_client()
 
     resp_obras = supabase.table("pcp_obras").select("id, nome").execute()
@@ -101,80 +103,123 @@ def gerar_pdf_semanal(data_ref_str):
     if resp_prog.data:
         dados_prog = resp_prog.data
 
-    total_atividades = len(dados_prog)
-    total_pontos_ppc = 0.0
-    total_dias_programados = 0
-    total_dias_executados = 0
+    dados_agrupados = {}
     contagem_causas = {}
 
     for d in dados_prog:
+        obra_id = d.get('obra_id')
+        obra_nome = mapa_obras.get(obra_id, "Outros")
+
+        if obra_nome not in dados_agrupados:
+            dados_agrupados[obra_nome] = {
+                "atividades_totais": 0,
+                "pontos_ppc": 0.0,
+                "dias_prog": 0,
+                "dias_exec": 0,
+                "lista_atividades": []
+            }
+
+        dados_agrupados[obra_nome]["atividades_totais"] += 1
+        dados_agrupados[obra_nome]["lista_atividades"].append(d)
+
         status_atual = d.get('status')
-        
         if status_atual == 'Concluido':
-            total_pontos_ppc += 1.0
+            dados_agrupados[obra_nome]["pontos_ppc"] += 1.0
         elif status_atual == 'Em Andamento':
             perc = d.get('percentual', 0)
             try:
                 val_perc = float(perc) if perc else 0.0
             except:
                 val_perc = 0.0
-            total_pontos_ppc += (val_perc / 100.0)
+            dados_agrupados[obra_nome]["pontos_ppc"] += (val_perc / 100.0)
 
         for dia in ['seg', 'ter', 'qua', 'qui', 'sex']:
             rec_val = d.get(f'rec_{dia}')
             feito_val = d.get(f'feito_{dia}')
             if rec_val and str(rec_val).strip() != '':
-                total_dias_programados += 1
+                dados_agrupados[obra_nome]["dias_prog"] += 1
                 if feito_val is True:
-                    total_dias_executados += 1
+                    dados_agrupados[obra_nome]["dias_exec"] += 1
 
         if status_atual in ['Nao Concluido', 'Em Andamento']:
             causa = d.get('causa')
             if causa:
                 contagem_causas[causa] = contagem_causas.get(causa, 0) + 1
 
-    ppc_global = (total_pontos_ppc / total_atividades * 100) if total_atividades > 0 else 0.0
-    pap_global = (total_dias_executados / total_dias_programados * 100) if total_dias_programados > 0 else 0.0
+    nomes_obras = list(dados_agrupados.keys())
+    ppc_obras = []
+    pap_obras = []
 
-    fig1, ax1 = plt.subplots(figsize=(6, 5))
-    barras1 = ax1.bar(['PPC', 'PAP'], [ppc_global, pap_global], color=['#E37026', '#1E3A8A'], width=0.6)
+    for nome in nomes_obras:
+        tot_atv = dados_agrupados[nome]["atividades_totais"]
+        pts = dados_agrupados[nome]["pontos_ppc"]
+        d_prog = dados_agrupados[nome]["dias_prog"]
+        d_exec = dados_agrupados[nome]["dias_exec"]
+
+        val_ppc = (pts / tot_atv * 100) if tot_atv > 0 else 0.0
+        val_pap = (d_exec / d_prog * 100) if d_prog > 0 else 0.0
+
+        ppc_obras.append(val_ppc)
+        pap_obras.append(val_pap)
+
+    x = np.arange(len(nomes_obras))
+    width = 0.35
+
+    fig1, ax1 = plt.subplots(figsize=(10, 5))
+    rects1 = ax1.bar(x - width/2, ppc_obras, width, label='PPC', color='#E37026')
+    rects2 = ax1.bar(x + width/2, pap_obras, width, label='PAP', color='#1E3A8A')
+
+    ax1.set_ylabel('Porcentagem (%)', fontweight='bold', color='#333333')
+    ax1.set_title('PPC e PAP por Obra', fontweight='bold', color='#1E3A8A', fontsize=14, pad=15)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels([n[:15] for n in nomes_obras], rotation=0, ha='center', fontweight='bold')
+    ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2, frameon=False)
     ax1.set_ylim(0, 115)
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
-    ax1.set_ylabel('Porcentagem (%)', fontweight='bold')
-    
-    ax1.text(0, ppc_global + 2, f"{ppc_global:.1f}%\n({total_pontos_ppc:.1f}/{total_atividades})", ha='center', va='bottom', fontweight='bold', color='#333333')
-    ax1.text(1, pap_global + 2, f"{pap_global:.1f}%\n({total_dias_executados}/{total_dias_programados})", ha='center', va='bottom', fontweight='bold', color='#333333')
-    
-    plt.title("Indicadores de Desempenho", fontweight='bold', fontsize=12, color='#1E3A8A')
+
+    def autolabel(rects):
+        for rect in rects:
+            height = rect.get_height()
+            ax1.annotate(f'{height:.0f}%',
+                         xy=(rect.get_x() + rect.get_width() / 2, height),
+                         xytext=(0, 3),
+                         textcoords="offset points",
+                         ha='center', va='bottom', fontweight='bold', fontsize=9, color='#333333')
+
+    autolabel(rects1)
+    autolabel(rects2)
+
     plt.tight_layout()
     tmp1 = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-    plt.savefig(tmp1.name, dpi=300)
+    plt.savefig(tmp1.name, dpi=300, bbox_inches='tight')
     plt.close(fig1)
 
-    fig2, ax2 = plt.subplots(figsize=(6, 5))
+    fig2, ax2 = plt.subplots(figsize=(10, 4))
     if contagem_causas:
-        causas_ordenadas = sorted(contagem_causas.items(), key=lambda x: x[1], reverse=False)
-        labels = [c[0][:20] for c in causas_ordenadas]
+        causas_ordenadas = sorted(contagem_causas.items(), key=lambda x: x[1], reverse=False)[-7:]
+        labels = [c[0][:30] for c in causas_ordenadas]
         valores = [c[1] for c in causas_ordenadas]
-        barras2 = ax2.barh(labels, valores, color='#E37026')
+        ax2.barh(labels, valores, color='#E37026', height=0.6)
         ax2.spines['top'].set_visible(False)
         ax2.spines['right'].set_visible(False)
-        ax2.set_xlabel('Quantidade de Ocorrencias', fontweight='bold')
+        ax2.set_xlabel('Quantidade de Ocorrencias (Top 7)', fontweight='bold', color='#333333')
+        ax2.set_title('Principais Restricoes Gerais', fontweight='bold', color='#1E3A8A', fontsize=14, pad=15)
+
         for i, v in enumerate(valores):
             ax2.text(v + 0.1, i, str(v), ha='left', va='center', fontweight='bold', color='#333333')
     else:
         ax2.text(0.5, 0.5, "Nenhum problema registrado", ha='center', va='center', fontweight='bold')
         ax2.axis('off')
-    plt.title("Principais Restricoes", fontweight='bold', fontsize=12, color='#1E3A8A')
+
     plt.tight_layout()
     tmp2 = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-    plt.savefig(tmp2.name, dpi=300)
+    plt.savefig(tmp2.name, dpi=300, bbox_inches='tight')
     plt.close(fig2)
 
     pdf = FPDF()
     pdf.add_page()
-    
+
     try:
         pdf.image('logo.png', x=10, y=8, w=30)
     except:
@@ -183,31 +228,32 @@ def gerar_pdf_semanal(data_ref_str):
     pdf.set_font("Arial", size=16, style='B')
     pdf.set_text_color(30, 58, 138)
     pdf.cell(0, 10, txt="Relatorio Semanal Global - Lavie", ln=True, align='C')
-    
+
     pdf.set_font("Arial", size=12)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(0, 8, txt=f"Semana de Referencia: {data_ref_str}", ln=True, align='C')
     pdf.ln(10)
 
-    pdf.image(tmp1.name, x=10, y=35, w=90)
-    pdf.image(tmp2.name, x=105, y=35, w=90)
-    pdf.ln(85)
+    pdf.image(tmp1.name, x=10, y=35, w=190)
+    pdf.ln(105)
+    pdf.image(tmp2.name, x=10, y=145, w=190)
 
     os.remove(tmp1.name)
     os.remove(tmp2.name)
 
-    dados_agrupados = {}
-    for d in dados_prog:
-        obra_nome = mapa_obras.get(d['obra_id'], "Obra Desconhecida")
-        if obra_nome not in dados_agrupados:
-            dados_agrupados[obra_nome] = []
-        dados_agrupados[obra_nome].append(d)
+    pdf.add_page()
+    pdf.set_font("Arial", size=14, style='B')
+    pdf.set_text_color(30, 58, 138)
+    pdf.cell(0, 10, txt="Detalhamento das Atividades", ln=True, align='C')
+    pdf.ln(5)
 
-    for obra, atividades in dados_agrupados.items():
+    for obra, dados_obra in dados_agrupados.items():
+        atividades = dados_obra["lista_atividades"]
+
         pdf.set_font("Arial", size=12, style='B')
         pdf.set_text_color(227, 112, 38)
         pdf.cell(0, 10, txt=f"Obra: {obra}", ln=True, align='L')
-        
+
         pdf.set_fill_color(30, 58, 138)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", size=9, style='B')
@@ -223,7 +269,7 @@ def gerar_pdf_semanal(data_ref_str):
             atividade = str(atv.get('atividade', ''))[:40]
             detalhe = str(atv.get('detalhe', ''))[:40]
             status = str(atv.get('status', ''))[:15]
-            
+
             pdf.cell(40, 7, txt=local, border=1)
             pdf.cell(60, 7, txt=atividade, border=1)
             pdf.cell(60, 7, txt=detalhe, border=1)
@@ -234,6 +280,7 @@ def gerar_pdf_semanal(data_ref_str):
         return pdf.output(dest='S').encode('latin-1')
     except TypeError:
         return bytes(pdf.output())
+        
 def login_screen():
     supabase = database.get_db_client()
     
