@@ -167,10 +167,10 @@ def gerar_pdf_semanal(data_ref_str):
 
     fig1, ax1 = plt.subplots(figsize=(10, 5))
     rects1 = ax1.bar(x - width/2, ppc_obras, width, label='PPC', color='#E37026')
-    rects2 = ax1.bar(x + width/2, pap_obras, width, label='PAP', color='#1E3A8A')
+    rects2 = ax1.bar(x + width/2, pap_obras, width, label='PAP', color='#3468fa')
 
     ax1.set_ylabel('Porcentagem (%)', fontweight='bold', color='#333333')
-    ax1.set_title('PPC e PAP por Obra', fontweight='bold', color='#1E3A8A', fontsize=14, pad=15)
+    ax1.set_title('PPC e PAP por Obra', fontweight='bold', color='#0a0a0a', fontsize=14, pad=15)
     ax1.set_xticks(x)
     ax1.set_xticklabels([n[:15] for n in nomes_obras], rotation=0, ha='center', fontweight='bold')
     ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2, frameon=False)
@@ -204,7 +204,7 @@ def gerar_pdf_semanal(data_ref_str):
         ax2.spines['top'].set_visible(False)
         ax2.spines['right'].set_visible(False)
         ax2.set_xlabel('Quantidade de Ocorrencias (Top 7)', fontweight='bold', color='#333333')
-        ax2.set_title('Principais Restricoes Gerais', fontweight='bold', color='#1E3A8A', fontsize=14, pad=15)
+        ax2.set_title('Principais Restricoes Gerais', fontweight='bold', color='#0a0a0a', fontsize=14, pad=15)
 
         for i, v in enumerate(valores):
             ax2.text(v + 0.1, i, str(v), ha='left', va='center', fontweight='bold', color='#333333')
@@ -226,8 +226,8 @@ def gerar_pdf_semanal(data_ref_str):
         pass
 
     pdf.set_font("Arial", size=16, style='B')
-    pdf.set_text_color(30, 58, 138)
-    pdf.cell(0, 10, txt="Relatorio Semanal Global - Lavie", ln=True, align='C')
+    pdf.set_text_color(10, 10, 10)
+    pdf.cell(0, 10, txt="Relatorio Semanal Planejamento", ln=True, align='C')
 
     pdf.set_font("Arial", size=12)
     pdf.set_text_color(100, 100, 100)
@@ -243,7 +243,7 @@ def gerar_pdf_semanal(data_ref_str):
 
     pdf.add_page()
     pdf.set_font("Arial", size=14, style='B')
-    pdf.set_text_color(30, 58, 138)
+    pdf.set_text_color(10, 10, 10)
     pdf.cell(0, 10, txt="Detalhamento das Atividades", ln=True, align='C')
     pdf.ln(5)
 
@@ -254,7 +254,7 @@ def gerar_pdf_semanal(data_ref_str):
         pdf.set_text_color(227, 112, 38)
         pdf.cell(0, 10, txt=f"Obra: {obra}", ln=True, align='L')
 
-        pdf.set_fill_color(30, 58, 138)
+        pdf.set_fill_color(10, 10, 10)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", size=9, style='B')
         pdf.cell(40, 8, txt="Local", border=1, fill=True)
@@ -264,16 +264,23 @@ def gerar_pdf_semanal(data_ref_str):
 
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("Arial", size=8)
+        
         for atv in atividades:
-            local = str(atv.get('local', ''))[:25]
-            atividade = str(atv.get('atividade', ''))[:40]
-            detalhe = str(atv.get('detalhe', ''))[:40]
-            status = str(atv.get('status', ''))[:15]
+            raw_local = str(atv.get('local', ''))
+            raw_ativ = str(atv.get('atividade', ''))
+            raw_det = str(atv.get('detalhe', ''))
+            raw_stat = str(atv.get('status', ''))
+
+            local = raw_local[:22] + "..." if len(raw_local) > 22 else raw_local
+            atividade = raw_ativ[:32] + "..." if len(raw_ativ) > 32 else raw_ativ
+            detalhe = raw_det[:32] + "..." if len(raw_det) > 32 else raw_det
+            status = raw_stat[:15]
 
             pdf.cell(40, 7, txt=local, border=1)
             pdf.cell(60, 7, txt=atividade, border=1)
             pdf.cell(60, 7, txt=detalhe, border=1)
             pdf.cell(30, 7, txt=status, border=1, ln=True, align='C')
+            
         pdf.ln(5)
 
     try:
