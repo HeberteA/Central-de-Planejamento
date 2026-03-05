@@ -88,16 +88,7 @@ def get_base64_image(image_path):
         return base64.b64encode(img_file.read()).decode()
 
 def gerar_pdf_semanal(data_ref_str):
-    _, col_login, _ = st.columns([1, 1, 1])
-    with col_login:
-        logo_file = "assets/logo.png" if os.path.exists("assets/logo.png") else "assets/logo.jpg"
-        img_b64 = get_base64_image(logo_file)
-        
-        if img_b64:
-            mime_type = "image/png" if logo_file.endswith(".png") else "image/jpeg"
-            header_html = f'<img src="data:{mime_type};base64,{img_b64}" style="width: 650px; height: auto; display: block; margin: 0 auto 20px auto;">'
-        else:
-            header_html = "<h2 style='color:#E37026; margin-bottom: 10px;'>LAVIE</h2>"
+
     import numpy as np
     
     supabase = database.get_db_client()
