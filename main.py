@@ -9,7 +9,7 @@ import base64
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 import tempfile
-import datetime
+from datetime import datetime, timedelta
 import os
 
 
