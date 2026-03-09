@@ -93,6 +93,7 @@ def gerar_pdf_semanal(data_ref_str):
     import tempfile
     import os
     from fpdf import FPDF
+    from datetime import datetime
     
     supabase = database.get_db_client()
 
@@ -110,7 +111,6 @@ def gerar_pdf_semanal(data_ref_str):
 
     dados_agrupados = {}
     contagem_causas = {}
-    status_geral = {"Concluido": 0, "Em Andamento": 0, "Nao Concluido": 0, "A Iniciar": 0}
     restricoes_por_obra = {}
 
     for r in dados_rest:
@@ -131,8 +131,6 @@ def gerar_pdf_semanal(data_ref_str):
         dados_agrupados[obra_nome]["lista_atividades"].append(d)
 
         status_atual = d.get('status', 'A Iniciar')
-        if status_atual in status_geral:
-            status_geral[status_atual] += 1
 
         if status_atual == 'Concluido':
             dados_agrupados[obra_nome]["pontos_ppc"] += 1.0
@@ -165,6 +163,12 @@ def gerar_pdf_semanal(data_ref_str):
         ppc_obras.append((pts / tot_atv * 100) if tot_atv > 0 else 0.0)
         pap_obras.append((d_exec / d_prog * 100) if d_prog > 0 else 0.0)
 
+    try:
+        data_obj = datetime.strptime(data_ref_str, "%Y-%m-%d")
+        legenda_semana = f"Semana: {data_obj.strftime('%d/%m/%Y')}"
+    except:
+        legenda_semana = f"Semana: {data_ref_str}"
+
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['text.color'] = '#374151'
     plt.rcParams['axes.labelcolor'] = '#374151'
@@ -175,12 +179,12 @@ def gerar_pdf_semanal(data_ref_str):
     fig.patch.set_facecolor('#ffffff')
 
     x = np.arange(len(nomes_obras))
-    width = 0.35
+    width = 0.4
+    
     ax1 = axs[0, 0]
     ax1.grid(axis='y', linestyle='--', alpha=0.5, color='#E5E7EB')
-    rects1 = ax1.bar(x - width/2, ppc_obras, width, label='PPC', color='#E37026', zorder=3)
-    rects2 = ax1.bar(x + width/2, pap_obras, width, label='PAP', color='#374151', zorder=3)
-    ax1.set_title('PPC e PAP por Obra', fontweight='bold', color='#374151', fontsize=12)
+    rects1 = ax1.bar(x, ppc_obras, width, label=legenda_semana, color='#E37026', zorder=3)
+    ax1.set_title('PPC por Obra', fontweight='bold', color='#374151', fontsize=12)
     ax1.set_xticks(x)
     ax1.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold')
     ax1.set_ylim(0, 115)
@@ -188,29 +192,28 @@ def gerar_pdf_semanal(data_ref_str):
     ax1.spines['right'].set_visible(False)
     ax1.spines['left'].set_color('#E5E7EB')
     ax1.spines['bottom'].set_color('#E5E7EB')
-    ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2, frameon=False)
+    ax1.legend(loc='upper right', frameon=False)
     
-    for rects in [rects1, rects2]:
-        for rect in rects:
-            height = rect.get_height()
-            ax1.text(rect.get_x() + rect.get_width() / 2, height + 2, f'{height:.0f}%', 
-                     ha='center', va='bottom', fontweight='bold', fontsize=9)
+    for rect in rects1:
+        height = rect.get_height()
+        ax1.text(rect.get_x() + rect.get_width() / 2, height + 2, f'{height:.0f}%', ha='center', va='bottom', fontweight='bold', fontsize=9)
 
     ax2 = axs[0, 1]
-    labels_st = [k for k, v in status_geral.items() if v > 0]
-    sizes_st = [v for v in status_geral.values() if v > 0]
-    cores_st = {'Concluido': '#E37026', 'Em Andamento': '#FDBA74', 'Nao Concluido': '#374151', 'A Iniciar': '#E5E7EB'}
-    cores_usadas = [cores_st[l] for l in labels_st]
+    ax2.grid(axis='y', linestyle='--', alpha=0.5, color='#E5E7EB')
+    rects2 = ax2.bar(x, pap_obras, width, label=legenda_semana, color='#374151', zorder=3)
+    ax2.set_title('PAP por Obra', fontweight='bold', color='#374151', fontsize=12)
+    ax2.set_xticks(x)
+    ax2.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold')
+    ax2.set_ylim(0, 115)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['left'].set_color('#E5E7EB')
+    ax2.spines['bottom'].set_color('#E5E7EB')
+    ax2.legend(loc='upper right', frameon=False)
     
-    if sizes_st:
-        wedges, texts, autotexts = ax2.pie(sizes_st, labels=labels_st, colors=cores_usadas, autopct='%1.1f%%', 
-                                           startangle=90, pctdistance=0.75, wedgeprops=dict(width=0.4, edgecolor='w'))
-        plt.setp(texts, fontweight='bold')
-        plt.setp(autotexts, fontweight='bold', color='white')
-        ax2.set_title('Status Geral das Atividades', fontweight='bold', color='#374151', fontsize=12)
-    else:
-        ax2.text(0.5, 0.5, "Sem Dados", ha='center', va='center', fontweight='bold')
-        ax2.axis('off')
+    for rect in rects2:
+        height = rect.get_height()
+        ax2.text(rect.get_x() + rect.get_width() / 2, height + 2, f'{height:.0f}%', ha='center', va='bottom', fontweight='bold', fontsize=9)
 
     ax3 = axs[1, 0]
     ax3.grid(axis='x', linestyle='--', alpha=0.5, color='#E5E7EB')
