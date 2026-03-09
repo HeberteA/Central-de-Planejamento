@@ -130,7 +130,7 @@ def app(obra_id):
         data_ref = st.date_input("Semana de Referência", datetime.now())
         start_week = data_ref - timedelta(days=data_ref.weekday())
         end_week = start_week + timedelta(days=4)
-    
+
     with c2:
         st.markdown("")
         st.info(f"Periodo: {start_week.strftime('%d/%m/%Y')} a {end_week.strftime('%d/%m/%Y')}")
@@ -148,7 +148,7 @@ def app(obra_id):
         resp = supabase.table("pcp_atividades_padrao").select("atividade").order("atividade").execute()
         if resp.data: lista_atividades = [a['atividade'] for a in resp.data]
     except: pass
-    
+
     lista_problemas = []
     try:
         resp = supabase.table("pcp_lista_problemas").select("*").execute()
@@ -158,11 +158,53 @@ def app(obra_id):
             lista_problemas.sort()
     except: pass
 
+    @st.dialog("Editar Atividade")
+    def dialog_editar_atividade(row_data, locais_disp, ativ_disp):
+        st.write("Altere as informações da atividade:")
+        
+        if locais_disp:
+            idx_l = locais_disp.index(row_data['local']) if row_data['local'] in locais_disp else 0
+            val_local = st.selectbox("Local", locais_disp, index=idx_l, key=f"ed_loc_{row_data['id']}")
+        else:
+            val_local = st.text_input("Local", value=row_data['local'], key=f"ed_loc_{row_data['id']}")
+
+        if ativ_disp:
+            idx_a = ativ_disp.index(row_data['atividade']) if row_data['atividade'] in ativ_disp else 0
+            val_ativ = st.selectbox("Atividade", ativ_disp, index=idx_a, key=f"ed_atv_{row_data['id']}")
+        else:
+            val_ativ = st.text_input("Atividade", value=row_data['atividade'], key=f"ed_atv_{row_data['id']}")
+        
+        val_detalhe = st.text_input("Detalhe / Recurso", value=row_data['detalhe'] if pd.notna(row_data['detalhe']) else "", key=f"ed_det_{row_data['id']}")
+        val_equipe = st.text_input("Equipe / Encarregado", value=row_data['encarregado'] if pd.notna(row_data['encarregado']) else "", key=f"ed_eq_{row_data['id']}")
+        
+        st.markdown("---")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Salvar", use_container_width=True):
+                dados_update = {
+                    "local": str(val_local).upper(),
+                    "atividade": str(val_ativ).upper(),
+                    "detalhe": str(val_detalhe).upper(),
+                    "encarregado": str(val_equipe).upper()
+                }
+                supabase.table("pcp_programacao_semanal").update(dados_update).eq("id", row_data['id']).execute()
+                st.toast("Atividade atualizada!", icon="✅")
+                time.sleep(0.5)
+                st.rerun()
+                
+        with c2:
+            if st.button("Excluir", type="primary", use_container_width=True):
+                supabase.table("pcp_programacao_semanal").delete().eq("id", row_data['id']).execute()
+                st.toast("Atividade excluída!", icon="🗑️")
+                time.sleep(0.5)
+                st.rerun()
+
     with st.expander("Nova Atividade", expanded=False):
         c_top = st.container()
-        
+
         c_a, c_b, c_c = c_top.columns(3)
-        
+
         with c_a:
             usar_texto = st.toggle("Digitar Manualmente?", key="tgg_atv_manual")
             if usar_texto:
@@ -177,7 +219,7 @@ def app(obra_id):
         cols_dias = c_days.columns(5)
         dias_labels = ["Segunda", "Terca", "Quarta", "Quinta", "Sexta"]
         dias_keys = ["seg", "ter", "qua", "qui", "sex"]
-        
+
         valores_dias = {}
 
         for i, col in enumerate(cols_dias):
@@ -186,7 +228,7 @@ def app(obra_id):
                 st.markdown(f"<div style='text-align:center; font-weight:bold; font-size:0.8rem; margin-bottom:5px;'>{dias_labels[i]}</div>", unsafe_allow_html=True)
                 use_day = st.checkbox("Incluir", key=f"chk_new_{dia_key}", label_visibility="collapsed")
                 val_day = st.text_input("Qtd", key=f"txt_new_{dia_key}", disabled=not use_day, label_visibility="collapsed", placeholder="-")
-                
+
                 if use_day:
                     valores_dias[dia_key] = val_day if val_day else "1"
                 else:
@@ -221,14 +263,14 @@ def app(obra_id):
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
-    
+
     st.markdown("---")
 
     response = supabase.table("pcp_programacao_semanal").select("*")\
         .eq("obra_id", obra_id)\
         .eq("data_inicio_semana", start_week.strftime('%Y-%m-%d'))\
-        .order("id", desc=False).execute()
- 
+        .order("local", desc=False).execute()
+
     df = pd.DataFrame(response.data)
 
     total_atividades = 0
@@ -241,7 +283,7 @@ def app(obra_id):
 
     if not df.empty and 'status' in df.columns:
         total_atividades = len(df)
-        
+
         for idx, row in df.iterrows():
             if row['status'] == 'Concluido':
                 total_pontos_ppc += 1.0
@@ -252,19 +294,19 @@ def app(obra_id):
                 except:
                     val_perc = 0.0
                 total_pontos_ppc += (val_perc / 100.0)
-            
+
             for dia in ['seg', 'ter', 'qua', 'qui', 'sex']:
                 rec_val = row.get(f'rec_{dia}')
                 feito_val = row.get(f'feito_{dia}')
-                
+
                 if rec_val and str(rec_val).strip() != '':
                     total_dias_programados += 1
                     if feito_val is True:
                         total_dias_executados += 1
-        
+
         if total_atividades > 0:
             ppc_percent = (total_pontos_ppc / total_atividades) * 100
-            
+
         if total_dias_programados > 0:
             pap_percent = (total_dias_executados / total_dias_programados) * 100
     else:
@@ -273,7 +315,7 @@ def app(obra_id):
                                    'rec_qua', 'feito_qua', 'rec_qui', 'feito_qui', 
                                    'rec_sex', 'feito_sex', 'causa', 'percentual', 'observacao'])
 
-    
+
     st.markdown(f"""
     <div class="kpi-container">
         <div class="kpi-card" style="border-bottom: 3px solid #E37026;">
@@ -298,178 +340,169 @@ def app(obra_id):
         st.info("Nenhuma atividade programada para esta semana.")
         return
 
-    st.markdown("#### Lista de Atividades")
-    busca_atividade = st.text_input("Filtrar Atividades", placeholder="Digite o nome da atividade para buscar...")
-    st.markdown("<br>", unsafe_allow_html=True)
+    cols = st.columns(2)
+    
+    for idx, row in df.iterrows():
+        col_atual = cols[idx % 2]
+        with st.container():
+            with col_atual:
+                status_color = "#888" 
+                if row['status'] == 'Concluido': status_color = "#4ADE80" 
+                elif row['status'] == 'Nao Concluido': status_color = "#EF4444" 
+                elif row['status'] == 'Em Andamento': status_color = "#E37026" 
+                
+                st.markdown(f"""
+                <div class="task-card" style="border-left-color: {status_color};">
+                    <div class="card-sub-text">{row['local']}</div>
+                    <span class="status-badge" style="color:{status_color};  border: 1px solid {status_color};">{row['status']}</span>
+                    <div class="card-header-text">{row['atividade']}</div>
+                    <div style="font-size: 0.8rem; color: #ccc; margin-bottom: 10px;">
+                        {row['detalhe'] or ''} <span style="color: #666">|</span> {row['encarregado'] or 'S/ Equipe'}
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                opcoes_status = ["A Iniciar", "Em Andamento", "Concluido", "Nao Concluido"]
+                idx_status = 0
+                if row['status'] in opcoes_status:
+                    idx_status = opcoes_status.index(row['status'])
+                
+                new_status = st.selectbox(
+                    "Status", 
+                    opcoes_status,
+                    index=idx_status,
+                    key=f"st_{row['id']}",
+                    label_visibility="collapsed"
+                )
+    
+                selected_causa = row.get('causa') 
+                
+                if new_status == "Em Andamento":
+                    db_perc = row.get('percentual', 0)
+                    if pd.isna(db_perc): db_perc = 0
 
-    if busca_atividade:
-        df_view = df[df['atividade'].str.contains(busca_atividade, case=False, na=False)]
-    else:
-        df_view = df
-
-    if df_view.empty:
-        st.warning("Nenhuma atividade encontrada com este nome.")
-    else:
-        cols = st.columns(2)
-        
-        for i, (idx, row) in enumerate(df_view.iterrows()):
-            col_atual = cols[i % 2]
-            with st.container():
-                with col_atual:
-                    status_color = "#888" 
-                    if row['status'] == 'Concluido': status_color = "#4ADE80" 
-                    elif row['status'] == 'Nao Concluido': status_color = "#EF4444" 
-                    elif row['status'] == 'Em Andamento': status_color = "#E37026" 
-                    
-                    st.markdown(f"""
-                    <div class="task-card" style="border-left-color: {status_color};">
-                        <div class="card-sub-text">{row['local']}</div>
-                        <span class="status-badge" style="color:{status_color};  border: 1px solid {status_color};">{row['status']}</span>
-                        <div class="card-header-text">{row['atividade']}</div>
-                        <div style="font-size: 0.8rem; color: #ccc; margin-bottom: 10px;">
-                            {row['detalhe'] or ''} <span style="color: #666">|</span> {row['encarregado'] or 'S/ Equipe'}
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    opcoes_status = ["A Iniciar", "Em Andamento", "Concluido", "Nao Concluido"]
-                    idx_status = 0
-                    if row['status'] in opcoes_status:
-                        idx_status = opcoes_status.index(row['status'])
-                    
-                    new_status = st.selectbox(
-                        "Status", 
-                        opcoes_status,
-                        index=idx_status,
-                        key=f"st_{row['id']}",
-                        label_visibility="collapsed"
+                    st.number_input(
+                        "Conclusão (%):", 
+                        min_value=0, 
+                        max_value=100, 
+                        value=int(db_perc),
+                        step=5,
+                        key=f"perc_{row['id']}"
                     )
-        
+    
+                if new_status in ["Nao Concluido", "Em Andamento"]:
                     selected_causa = row.get('causa') 
-                    
-                    if new_status == "Em Andamento":
-                        db_perc = row.get('percentual', 0)
-                        if pd.isna(db_perc): db_perc = 0
-                        
-                        st.number_input(
-                            "Conclusão (%):", 
-                            min_value=0, 
-                            max_value=100, 
-                            value=int(db_perc),
-                            step=5,
-                            key=f"perc_{row['id']}"
-                        )
-        
-                    if new_status in ["Nao Concluido", "Em Andamento"]:
-                        selected_causa = row.get('causa') 
-                        idx_causa = None
-                        
-                        if selected_causa and selected_causa in lista_problemas:
-                            idx_causa = lista_problemas.index(selected_causa)
-                        
-                        st.selectbox(
-                            "Motivo / Problema:",
-                            lista_problemas,
-                            index=idx_causa,
-                            key=f"causa_{row['id']}",
-                            placeholder="Selecione o problema..."
-                        )
-        
-                    if new_status in ["Em Andamento", "Nao Concluido"]:
-                        db_obs = row.get('observacao', '')
-                        if pd.isna(db_obs): db_obs = ""
-                        
-                        st.text_area(
-                            "Observação:",
-                            value=db_obs,
-                            key=f"obs_{row['id']}",
-                            height=68,
-                            placeholder="Descreva detalhes..."
-                        )
-        
-                    st.markdown('<div style="margin: 5px 0;"></div>', unsafe_allow_html=True)
-                    
-                    d1, d2, d3, d4, d5 = st.columns(5)
-                    
-                    def day_widget(col_obj, label, db_val_rec, db_val_chk, suffix_id):
-                        with col_obj:
-                            is_disabled = (db_val_rec is None or str(db_val_rec).strip() == '')
-                            st.markdown(f"<div class='day-label'>{label}</div>", unsafe_allow_html=True)
-                            if not is_disabled:
-                                chk = st.checkbox("ok", value=db_val_chk, key=f"chk_{label}_{suffix_id}", label_visibility="collapsed")
-                                txt = st.text_area("r", value=db_val_rec, key=f"txt_{label}_{suffix_id}", label_visibility="collapsed", height=35)
-                                return chk, txt
-                            else:
-                                st.markdown("<div style='height: 28px; background: #222; border-radius: 4px; opacity: 0.3;'></div>", unsafe_allow_html=True)
-                                return False, None
-        
-                    chk_seg, txt_seg = day_widget(d1, "SEG", row['rec_seg'], row['feito_seg'], row['id'])
-                    chk_ter, txt_ter = day_widget(d2, "TER", row['rec_ter'], row['feito_ter'], row['id'])
-                    chk_qua, txt_qua = day_widget(d3, "QUA", row['rec_qua'], row['feito_qua'], row['id'])
-                    chk_qui, txt_qui = day_widget(d4, "QUI", row['rec_qui'], row['feito_qui'], row['id'])
-                    chk_sex, txt_sex = day_widget(d5, "SEX", row['rec_sex'], row['feito_sex'], row['id'])
-        
-                    st.markdown('<div style="margin-top: 5px; border-top: 1px solid #333; padding-top: 10px;">', unsafe_allow_html=True)
-                    
-                    c_btn1, c_btn2 = st.columns([2, 1])
-                    
-                    with c_btn1:
-                        if st.button("Salvar", key=f"save_{row['id']}", use_container_width=True):
-                            status_atual = st.session_state[f"st_{row['id']}"]
-                            up_data = {"status": status_atual}
-                            
-                            if txt_seg is not None: 
-                                up_data["rec_seg"] = txt_seg
-                                up_data["feito_seg"] = chk_seg
-                            if txt_ter is not None: 
-                                up_data["rec_ter"] = txt_ter
-                                up_data["feito_ter"] = chk_ter
-                            if txt_qua is not None: 
-                                up_data["rec_qua"] = txt_qua
-                                up_data["feito_qua"] = chk_qua
-                            if txt_qui is not None: 
-                                up_data["rec_qui"] = txt_qui
-                                up_data["feito_qui"] = chk_qui
-                            if txt_sex is not None: 
-                                up_data["rec_sex"] = txt_sex
-                                up_data["feito_sex"] = chk_sex
-        
-                            if status_atual in ["Nao Concluido", "Em Andamento"]:
-                                causa_val = st.session_state.get(f"causa_{row['id']}")
-                                up_data['causa'] = causa_val
-                            else:
-                                up_data['causa'] = None
-                            if status_atual == "Em Andamento":
-                                perc_val = st.session_state.get(f"perc_{row['id']}")
-                                up_data['percentual'] = perc_val
-                            elif status_atual == "Concluido":
-                                up_data['percentual'] = 100
-                            else:
-                                up_data['percentual'] = 0
-                            if status_atual in ["Em Andamento", "Nao Concluido"]:
-                                obs_val = st.session_state.get(f"obs_{row['id']}")
-                                up_data['observacao'] = obs_val
-                            else:
-                                up_data['observacao'] = None
-        
-                            try:
-                                supabase.table("pcp_programacao_semanal").update(up_data).eq("id", row['id']).execute()
-                                st.toast("Salvo!", icon="✅")
-                                time.sleep(0.5)
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erro: {e}")
-        
-                    with c_btn2:
-                        if st.button("Excluir", key=f"del_{row['id']}", type="primary", use_container_width=True):
-                            supabase.table("pcp_programacao_semanal").delete().eq("id", row['id']).execute()
+                    idx_causa = None
+
+                    if selected_causa and selected_causa in lista_problemas:
+                        idx_causa = lista_problemas.index(selected_causa)
+
+
+
+                    st.selectbox(
+                        "Motivo / Problema:",
+                        lista_problemas,
+                        index=idx_causa,
+                        key=f"causa_{row['id']}",
+                        placeholder="Selecione o problema..."
+                    )
+    
+                if new_status in ["Em Andamento", "Nao Concluido"]:
+                    db_obs = row.get('observacao', '')
+                    if pd.isna(db_obs): db_obs = ""
+
+                    st.text_area(
+                        "Observação:",
+                        value=db_obs,
+                        key=f"obs_{row['id']}",
+                        height=68,
+                        placeholder="Descreva detalhes..."
+                    )
+    
+                st.markdown('<div style="margin: 5px 0;"></div>', unsafe_allow_html=True)
+                
+                d1, d2, d3, d4, d5 = st.columns(5)
+                
+                def day_widget(col_obj, label, db_val_rec, db_val_chk, suffix_id):
+                    with col_obj:
+                        is_disabled = (db_val_rec is None or str(db_val_rec).strip() == '')
+                        st.markdown(f"<div class='day-label'>{label}</div>", unsafe_allow_html=True)
+                        if not is_disabled:
+                            chk = st.checkbox("ok", value=db_val_chk, key=f"chk_{label}_{suffix_id}", label_visibility="collapsed")
+                            txt = st.text_area("r", value=db_val_rec, key=f"txt_{label}_{suffix_id}", label_visibility="collapsed", height=35)
+                            return chk, txt
+                        else:
+                            st.markdown("<div style='height: 28px; background: #222; border-radius: 4px; opacity: 0.3;'></div>", unsafe_allow_html=True)
+                            return False, None
+    
+                chk_seg, txt_seg = day_widget(d1, "SEG", row['rec_seg'], row['feito_seg'], row['id'])
+                chk_ter, txt_ter = day_widget(d2, "TER", row['rec_ter'], row['feito_ter'], row['id'])
+                chk_qua, txt_qua = day_widget(d3, "QUA", row['rec_qua'], row['feito_qua'], row['id'])
+                chk_qui, txt_qui = day_widget(d4, "QUI", row['rec_qui'], row['feito_qui'], row['id'])
+                chk_sex, txt_sex = day_widget(d5, "SEX", row['rec_sex'], row['feito_sex'], row['id'])
+    
+                st.markdown('<div style="margin-top: 5px; border-top: 1px solid #333; padding-top: 10px;">', unsafe_allow_html=True)
+                
+                c_btn1, c_btn2 = st.columns([2, 1])
+                
+                with c_btn1:
+                    if st.button("Salvar", key=f"save_{row['id']}", use_container_width=True):
+                        status_atual = st.session_state[f"st_{row['id']}"]
+                        up_data = {"status": status_atual}
+
+                        if txt_seg is not None: 
+                            up_data["rec_seg"] = txt_seg
+                            up_data["feito_seg"] = chk_seg
+                        if txt_ter is not None: 
+                            up_data["rec_ter"] = txt_ter
+                            up_data["feito_ter"] = chk_ter
+                        if txt_qua is not None: 
+                            up_data["rec_qua"] = txt_qua
+                            up_data["feito_qua"] = chk_qua
+                        if txt_qui is not None: 
+                            up_data["rec_qui"] = txt_qui
+                            up_data["feito_qui"] = chk_qui
+                        if txt_sex is not None: 
+                            up_data["rec_sex"] = txt_sex
+                            up_data["feito_sex"] = chk_sex
+    
+                        if status_atual in ["Nao Concluido", "Em Andamento"]:
+                            causa_val = st.session_state.get(f"causa_{row['id']}")
+                            up_data['causa'] = causa_val
+                        else:
+                            up_data['causa'] = None
+                        if status_atual == "Em Andamento":
+                            perc_val = st.session_state.get(f"perc_{row['id']}")
+                            up_data['percentual'] = perc_val
+                        elif status_atual == "Concluido":
+                            up_data['percentual'] = 100
+                        else:
+                            up_data['percentual'] = 0
+                        if status_atual in ["Em Andamento", "Nao Concluido"]:
+                            obs_val = st.session_state.get(f"obs_{row['id']}")
+                            up_data['observacao'] = obs_val
+                        else:
+                            up_data['observacao'] = None
+    
+                        try:
+                            supabase.table("pcp_programacao_semanal").update(up_data).eq("id", row['id']).execute()
+                            st.toast("Salvo!", icon="✅")
+                            time.sleep(0.5)
+
+
                             st.rerun()
-                      
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
+    
+                with c_btn2:
+                    if st.button("Editar", key=f"edit_{row['id']}", use_container_width=True):
+                        dialog_editar_atividade(row, lista_locais, lista_atividades)
+
     st.markdown("---")
     st.markdown("##### Fechamento da Semana")
-    
+
     with st.expander("Finalizar Semana"):
         st.info("Ao finalizar, os indicadores desta semana serao salvos no historico.")
-        
+
         if st.button("Confirmar Fechamento", type="primary", use_container_width=True):
             try:
                 data_ref_str = start_week.strftime('%Y-%m-%d')
@@ -479,7 +512,7 @@ def app(obra_id):
 
                 supabase.table("pcp_historico_indicadores").delete()\
                     .eq("obra_id", obra_id).eq("data_referencia", data_ref_str).execute()
-                
+
                 supabase.table("pcp_historico_problemas").delete()\
                     .eq("obra_id", obra_id).eq("data_referencia", data_ref_str).execute()
 
@@ -493,7 +526,7 @@ def app(obra_id):
                     "meta_percentual": 80.0,
                     "data_referencia": data_ref_str
                 }).execute()
-                
+
                 supabase.table("pcp_historico_indicadores").insert({
                     "obra_id": obra_id,
                     "mes": mes_nome,
@@ -506,7 +539,7 @@ def app(obra_id):
                 }).execute()
 
                 causas_series = df[df['status'] == 'Nao Concluido']['causa'].value_counts()
-                
+
                 if not causas_series.empty:
                     lista_problemas_insert = []
                     for causa, qtd in causas_series.items():
@@ -520,10 +553,10 @@ def app(obra_id):
                                 "quantidade": int(qtd),
                                 "data_referencia": data_ref_str
                             })
-                    
+
                     if lista_problemas_insert:
                         supabase.table("pcp_historico_problemas").insert(lista_problemas_insert).execute()
-                
+
                 st.success("Semana finalizada com sucesso!")
                 st.balloons()
                 time.sleep(1)
