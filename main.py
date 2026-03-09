@@ -186,7 +186,7 @@ def gerar_pdf_semanal(data_ref_str):
     rects1 = ax1.bar(x, ppc_obras, width, label=legenda_semana, color='#E37026', zorder=3)
     ax1.set_title('PPC por Obra', fontweight='bold', color='#374151', fontsize=12)
     ax1.set_xticks(x)
-    ax1.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold')
+    ax1.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', rotation=45, ha='right')
     ax1.set_ylim(0, 115)
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
@@ -203,7 +203,7 @@ def gerar_pdf_semanal(data_ref_str):
     rects2 = ax2.bar(x, pap_obras, width, label=legenda_semana, color='#374151', zorder=3)
     ax2.set_title('PAP por Obra', fontweight='bold', color='#374151', fontsize=12)
     ax2.set_xticks(x)
-    ax2.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold')
+    ax2.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', rotation=45, ha='right')
     ax2.set_ylim(0, 115)
     ax2.spines['top'].set_visible(False)
     ax2.spines['right'].set_visible(False)
@@ -242,7 +242,8 @@ def gerar_pdf_semanal(data_ref_str):
         x_rest = np.arange(len(obras_rest))
         rects4 = ax4.bar(x_rest, vol_rest, color='#374151', width=0.5, zorder=3)
         ax4.set_xticks(x_rest)
-        ax4.set_xticklabels([o[:15] for o in obras_rest], fontweight='bold')
+        # ROTAÇÃO APLICADA AQUI
+        ax4.set_xticklabels([o[:15] for o in obras_rest], fontweight='bold', rotation=45, ha='right')
         ax4.set_title('Volume de Restricoes Ativas', fontweight='bold', color='#374151', fontsize=12)
         for rect in rects4:
             height = rect.get_height()
