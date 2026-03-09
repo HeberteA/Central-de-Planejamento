@@ -113,7 +113,6 @@ def gerar_pdf_semanal(data_ref_str):
     status_geral = {"Concluido": 0, "Em Andamento": 0, "Nao Concluido": 0, "A Iniciar": 0}
     restricoes_por_obra = {}
 
-    
     for r in dados_rest:
         obra_nome = mapa_obras.get(r.get('obra_id'), "Outros")
         if obra_nome not in restricoes_por_obra:
@@ -167,79 +166,90 @@ def gerar_pdf_semanal(data_ref_str):
         pap_obras.append((d_exec / d_prog * 100) if d_prog > 0 else 0.0)
 
     plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['text.color'] = '#374151'
+    plt.rcParams['axes.labelcolor'] = '#374151'
+    plt.rcParams['xtick.color'] = '#374151'
+    plt.rcParams['ytick.color'] = '#374151'
+    
     fig, axs = plt.subplots(2, 2, figsize=(14, 10))
     fig.patch.set_facecolor('#ffffff')
 
     x = np.arange(len(nomes_obras))
     width = 0.35
     ax1 = axs[0, 0]
-    ax1.grid(axis='y', linestyle='--', alpha=0.7, color='#E5E7EB')
+    ax1.grid(axis='y', linestyle='--', alpha=0.5, color='#E5E7EB')
     rects1 = ax1.bar(x - width/2, ppc_obras, width, label='PPC', color='#E37026', zorder=3)
-    rects2 = ax1.bar(x + width/2, pap_obras, width, label='PAP', color='#1E3A8A', zorder=3)
-    ax1.set_title('PPC e PAP por Obra', fontweight='bold', color='#1E3A8A', fontsize=12)
+    rects2 = ax1.bar(x + width/2, pap_obras, width, label='PAP', color='#374151', zorder=3)
+    ax1.set_title('PPC e PAP por Obra', fontweight='bold', color='#374151', fontsize=12)
     ax1.set_xticks(x)
-    ax1.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', color='#4B5563')
+    ax1.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold')
     ax1.set_ylim(0, 115)
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
+    ax1.spines['left'].set_color('#E5E7EB')
+    ax1.spines['bottom'].set_color('#E5E7EB')
     ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2, frameon=False)
     
     for rects in [rects1, rects2]:
         for rect in rects:
             height = rect.get_height()
             ax1.text(rect.get_x() + rect.get_width() / 2, height + 2, f'{height:.0f}%', 
-                     ha='center', va='bottom', fontweight='bold', fontsize=9, color='#1F2937')
+                     ha='center', va='bottom', fontweight='bold', fontsize=9)
 
     ax2 = axs[0, 1]
     labels_st = [k for k, v in status_geral.items() if v > 0]
     sizes_st = [v for v in status_geral.values() if v > 0]
-    cores_st = {'Concluido': '#4ADE80', 'Em Andamento': '#E37026', 'Nao Concluido': '#EF4444', 'A Iniciar': '#9CA3AF'}
+    cores_st = {'Concluido': '#E37026', 'Em Andamento': '#FDBA74', 'Nao Concluido': '#374151', 'A Iniciar': '#E5E7EB'}
     cores_usadas = [cores_st[l] for l in labels_st]
     
     if sizes_st:
         wedges, texts, autotexts = ax2.pie(sizes_st, labels=labels_st, colors=cores_usadas, autopct='%1.1f%%', 
                                            startangle=90, pctdistance=0.75, wedgeprops=dict(width=0.4, edgecolor='w'))
-        plt.setp(texts, fontweight='bold', color='#4B5563')
+        plt.setp(texts, fontweight='bold')
         plt.setp(autotexts, fontweight='bold', color='white')
-        ax2.set_title('Status Geral das Atividades', fontweight='bold', color='#1E3A8A', fontsize=12)
+        ax2.set_title('Status Geral das Atividades', fontweight='bold', color='#374151', fontsize=12)
     else:
-        ax2.text(0.5, 0.5, "Sem Dados", ha='center', va='center', fontweight='bold', color='#9CA3AF')
+        ax2.text(0.5, 0.5, "Sem Dados", ha='center', va='center', fontweight='bold')
         ax2.axis('off')
 
     ax3 = axs[1, 0]
-    ax3.grid(axis='x', linestyle='--', alpha=0.7, color='#E5E7EB')
+    ax3.grid(axis='x', linestyle='--', alpha=0.5, color='#E5E7EB')
     if contagem_causas:
         causas_ord = sorted(contagem_causas.items(), key=lambda x: x[1], reverse=False)[-5:]
         y_pos = np.arange(len(causas_ord))
-        ax3.barh(y_pos, [c[1] for c in causas_ord], color='#EF4444', zorder=3)
+        ax3.barh(y_pos, [c[1] for c in causas_ord], color='#E37026', zorder=3, height=0.6)
         ax3.set_yticks(y_pos)
-        ax3.set_yticklabels([c[0][:25] + "..." if len(c[0])>25 else c[0] for c in causas_ord], fontweight='bold', color='#4B5563')
-        ax3.set_title('Principais Restrições/Motivos (Geral)', fontweight='bold', color='#1E3A8A', fontsize=12)
+        ax3.set_yticklabels([c[0][:25] + "..." if len(c[0])>25 else c[0] for c in causas_ord], fontweight='bold')
+        ax3.set_title('Top Motivos de Nao Conclusao', fontweight='bold', color='#374151', fontsize=12)
         for i, v in enumerate([c[1] for c in causas_ord]):
-            ax3.text(v + 0.1, i, str(v), va='center', fontweight='bold', color='#1F2937')
+            ax3.text(v + 0.1, i, str(v), va='center', fontweight='bold')
     else:
-        ax3.text(0.5, 0.5, "Nenhum problema registrado", ha='center', va='center', fontweight='bold', color='#9CA3AF')
+        ax3.text(0.5, 0.5, "Nenhum problema", ha='center', va='center', fontweight='bold')
     ax3.spines['top'].set_visible(False)
     ax3.spines['right'].set_visible(False)
+    ax3.spines['left'].set_color('#E5E7EB')
+    ax3.spines['bottom'].set_color('#E5E7EB')
 
     ax4 = axs[1, 1]
-    ax4.grid(axis='y', linestyle='--', alpha=0.7, color='#E5E7EB')
+    ax4.grid(axis='y', linestyle='--', alpha=0.5, color='#E5E7EB')
     obras_rest = list(restricoes_por_obra.keys())
     vol_rest = [len(restricoes_por_obra[o]) for o in obras_rest]
     
     if vol_rest and sum(vol_rest) > 0:
         x_rest = np.arange(len(obras_rest))
-        rects4 = ax4.bar(x_rest, vol_rest, color='#F59E0B', width=0.5, zorder=3)
+        rects4 = ax4.bar(x_rest, vol_rest, color='#374151', width=0.5, zorder=3)
         ax4.set_xticks(x_rest)
-        ax4.set_xticklabels([o[:15] for o in obras_rest], fontweight='bold', color='#4B5563')
-        ax4.set_title('Volume de Restrições Ativas por Obra', fontweight='bold', color='#1E3A8A', fontsize=12)
+        ax4.set_xticklabels([o[:15] for o in obras_rest], fontweight='bold')
+        ax4.set_title('Volume de Restricoes Ativas', fontweight='bold', color='#374151', fontsize=12)
         for rect in rects4:
             height = rect.get_height()
-            ax4.text(rect.get_x() + rect.get_width() / 2, height + 0.1, str(height), ha='center', va='bottom', fontweight='bold', color='#1F2937')
+            ax4.text(rect.get_x() + rect.get_width() / 2, height + 0.1, str(height), ha='center', va='bottom', fontweight='bold')
     else:
-        ax4.text(0.5, 0.5, "Nenhuma restrição registrada", ha='center', va='center', fontweight='bold', color='#9CA3AF')
+        ax4.text(0.5, 0.5, "Nenhuma restricao", ha='center', va='center', fontweight='bold')
     ax4.spines['top'].set_visible(False)
     ax4.spines['right'].set_visible(False)
+    ax4.spines['left'].set_color('#E5E7EB')
+    ax4.spines['bottom'].set_color('#E5E7EB')
 
     plt.tight_layout(pad=4.0)
     tmp_dash = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
@@ -254,7 +264,7 @@ def gerar_pdf_semanal(data_ref_str):
     except:
         pass
     pdf.set_font("Arial", size=18, style='B')
-    pdf.set_text_color(30, 58, 138)
+    pdf.set_text_color(55, 65, 81)
     pdf.cell(0, 10, txt="DASHBOARD GERENCIAL - LAVIE", ln=True, align='C')
     pdf.set_font("Arial", size=11)
     pdf.set_text_color(100, 100, 100)
@@ -263,25 +273,47 @@ def gerar_pdf_semanal(data_ref_str):
 
     pdf.image(tmp_dash.name, x=5, y=35, w=200)
     os.remove(tmp_dash.name)
+
+    def calcular_altura_linha(pdf, textos, larguras):
+        max_h = 0
+        for i, txt in enumerate(textos):
+            palavras = txt.split()
+            linhas = 1
+            largura_atual = 0
+            for p in palavras:
+                largura_p = pdf.get_string_width(p + " ")
+                if largura_atual + largura_p > (larguras[i] - 2):
+                    linhas += 1
+                    largura_atual = largura_p
+                else:
+                    largura_atual += largura_p
+            h = max(1, linhas + txt.count('\n')) * 6
+            if h > max_h:
+                max_h = h
+        return max_h
+
     for obra in nomes_obras:
         pdf.add_page()
         
         pdf.set_font("Arial", size=14, style='B')
-        pdf.set_text_color(30, 58, 138)
+        pdf.set_text_color(55, 65, 81)
         pdf.cell(0, 10, txt=f"OBRA: {obra.upper()}", ln=True, align='L', border='B')
         pdf.ln(5)
 
         pdf.set_font("Arial", size=11, style='B')
         pdf.set_text_color(227, 112, 38)
-        pdf.cell(0, 8, txt="1. Status da Programação Semanal", ln=True)
+        pdf.cell(0, 8, txt="1. Status da Programacao Semanal", ln=True)
         
-        pdf.set_fill_color(30, 58, 138)
+        pdf.set_fill_color(55, 65, 81)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", size=9, style='B')
-        pdf.cell(40, 8, txt="Local", border=1, fill=True)
-        pdf.cell(60, 8, txt="Atividade", border=1, fill=True)
-        pdf.cell(60, 8, txt="Detalhe", border=1, fill=True)
-        pdf.cell(30, 8, txt="Status", border=1, fill=True, ln=True, align='C')
+        
+        larguras_prog = [40, 45, 75, 30]
+        
+        pdf.cell(larguras_prog[0], 8, txt="Local", border=1, fill=True)
+        pdf.cell(larguras_prog[1], 8, txt="Atividade", border=1, fill=True)
+        pdf.cell(larguras_prog[2], 8, txt="Detalhe", border=1, fill=True)
+        pdf.cell(larguras_prog[3], 8, txt="Status", border=1, fill=True, ln=True, align='C')
 
         pdf.set_text_color(50, 50, 50)
         pdf.set_font("Arial", size=8)
@@ -292,26 +324,45 @@ def gerar_pdf_semanal(data_ref_str):
             det = str(atv.get('detalhe', ''))
             sta = str(atv.get('status', ''))
 
-            pdf.cell(40, 7, txt=loc[:22] + "..." if len(loc) > 22 else loc, border=1)
-            pdf.cell(60, 7, txt=ati[:32] + "..." if len(ati) > 32 else ati, border=1)
-            pdf.cell(60, 7, txt=det[:32] + "..." if len(det) > 32 else det, border=1)
-            pdf.cell(30, 7, txt=sta[:15], border=1, ln=True, align='C')
+            textos_linha = [loc, ati, det, sta]
+            h_linha = calcular_altura_linha(pdf, textos_linha, larguras_prog)
+            
+            if pdf.get_y() + h_linha > 270:
+                pdf.add_page()
+
+            x_start = pdf.get_x()
+            y_start = pdf.get_y()
+            
+            for i, txt in enumerate(textos_linha):
+                pdf.rect(x_start, y_start, larguras_prog[i], h_linha)
+                pdf.set_xy(x_start, y_start)
+                alinhamento = 'C' if i == 3 else 'L'
+                pdf.multi_cell(larguras_prog[i], 6, txt, border=0, align=alinhamento)
+                x_start += larguras_prog[i]
+            
+            pdf.set_xy(10, y_start + h_linha)
             
         pdf.ln(10)
 
         restricoes_desta_obra = restricoes_por_obra.get(obra, [])
         if restricoes_desta_obra:
+            if pdf.get_y() > 240:
+                pdf.add_page()
+                
             pdf.set_font("Arial", size=11, style='B')
             pdf.set_text_color(227, 112, 38)
-            pdf.cell(0, 8, txt="2. Quadro de Restrições Ativas", ln=True)
+            pdf.cell(0, 8, txt="2. Quadro de Restricoes Ativas", ln=True)
             
-            pdf.set_fill_color(30, 58, 138)
+            pdf.set_fill_color(55, 65, 81)
             pdf.set_text_color(255, 255, 255)
             pdf.set_font("Arial", size=9, style='B')
-            pdf.cell(70, 8, txt="Descrição da Restrição", border=1, fill=True)
-            pdf.cell(45, 8, txt="Responsável", border=1, fill=True)
-            pdf.cell(35, 8, txt="Data Prevista", border=1, fill=True)
-            pdf.cell(40, 8, txt="Status", border=1, fill=True, ln=True, align='C')
+            
+            larguras_rest = [70, 45, 35, 40]
+            
+            pdf.cell(larguras_rest[0], 8, txt="Descricao da Restricao", border=1, fill=True)
+            pdf.cell(larguras_rest[1], 8, txt="Responsavel", border=1, fill=True)
+            pdf.cell(larguras_rest[2], 8, txt="Data Prevista", border=1, fill=True)
+            pdf.cell(larguras_rest[3], 8, txt="Status", border=1, fill=True, ln=True, align='C')
 
             pdf.set_text_color(50, 50, 50)
             pdf.set_font("Arial", size=8)
@@ -322,10 +373,23 @@ def gerar_pdf_semanal(data_ref_str):
                 data_prev = str(rest.get('data_prevista', str(rest.get('data_limite', ''))))
                 stat_rest = str(rest.get('status', ''))
 
-                pdf.cell(70, 7, txt=desc[:40] + "..." if len(desc) > 40 else desc, border=1)
-                pdf.cell(45, 7, txt=resp[:25] + "..." if len(resp) > 25 else resp, border=1)
-                pdf.cell(35, 7, txt=data_prev[:15], border=1)
-                pdf.cell(40, 7, txt=stat_rest[:20], border=1, ln=True, align='C')
+                textos_rest = [desc, resp, data_prev, stat_rest]
+                h_linha = calcular_altura_linha(pdf, textos_rest, larguras_rest)
+                
+                if pdf.get_y() + h_linha > 270:
+                    pdf.add_page()
+
+                x_start = pdf.get_x()
+                y_start = pdf.get_y()
+                
+                for i, txt in enumerate(textos_rest):
+                    pdf.rect(x_start, y_start, larguras_rest[i], h_linha)
+                    pdf.set_xy(x_start, y_start)
+                    alinhamento = 'C' if i in [2, 3] else 'L'
+                    pdf.multi_cell(larguras_rest[i], 6, txt, border=0, align=alinhamento)
+                    x_start += larguras_rest[i]
+                
+                pdf.set_xy(10, y_start + h_linha)
 
     try:
         return pdf.output(dest='S').encode('latin-1')
