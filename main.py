@@ -169,11 +169,7 @@ def gerar_pdf_semanal(data_ref_str):
     except:
         legenda_semana = f"Semana: {data_ref_str}"
 
-    try:
-        pdf = FPDF(orientation='L', unit='mm', format='A4')
-        pdf.add_page()
-        try: pdf.image("Lavie.png", x=10, y=5, w=35)
-        except: pass 
+    
 
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['text.color'] = '#374151'
