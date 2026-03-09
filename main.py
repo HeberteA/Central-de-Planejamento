@@ -88,68 +88,74 @@ def get_base64_image(image_path):
         return base64.b64encode(img_file.read()).decode()
 
 def gerar_pdf_semanal(data_ref_str):
-
     import numpy as np
+    import matplotlib.pyplot as plt
+    import tempfile
+    import os
+    from fpdf import FPDF
     
     supabase = database.get_db_client()
 
     resp_obras = supabase.table("pcp_obras").select("id, nome").execute()
-    mapa_obras = {}
-    if resp_obras.data:
-        for o in resp_obras.data:
-            mapa_obras[o['id']] = o['nome']
+    mapa_obras = {o['id']: o['nome'] for o in resp_obras.data} if resp_obras.data else {}
 
     resp_prog = supabase.table("pcp_programacao_semanal").select("*").eq("data_inicio_semana", data_ref_str).execute()
-    dados_prog = []
-    if resp_prog.data:
-        dados_prog = resp_prog.data
+    dados_prog = resp_prog.data if resp_prog.data else []
+
+    try:
+        resp_rest = supabase.table("pcp_restricoes").select("*").execute()
+        dados_rest = resp_rest.data if resp_rest.data else []
+    except:
+        dados_rest = []
 
     dados_agrupados = {}
     contagem_causas = {}
+    status_geral = {"Concluido": 0, "Em Andamento": 0, "Nao Concluido": 0, "A Iniciar": 0}
+    restricoes_por_obra = {}
+
+    
+    for r in dados_rest:
+        obra_nome = mapa_obras.get(r.get('obra_id'), "Outros")
+        if obra_nome not in restricoes_por_obra:
+            restricoes_por_obra[obra_nome] = []
+        restricoes_por_obra[obra_nome].append(r)
 
     for d in dados_prog:
-        obra_id = d.get('obra_id')
-        obra_nome = mapa_obras.get(obra_id, "Outros")
+        obra_nome = mapa_obras.get(d.get('obra_id'), "Outros")
 
         if obra_nome not in dados_agrupados:
             dados_agrupados[obra_nome] = {
-                "atividades_totais": 0,
-                "pontos_ppc": 0.0,
-                "dias_prog": 0,
-                "dias_exec": 0,
-                "lista_atividades": []
+                "atividades_totais": 0, "pontos_ppc": 0.0, "dias_prog": 0, "dias_exec": 0, "lista_atividades": []
             }
 
         dados_agrupados[obra_nome]["atividades_totais"] += 1
         dados_agrupados[obra_nome]["lista_atividades"].append(d)
 
-        status_atual = d.get('status')
+        status_atual = d.get('status', 'A Iniciar')
+        if status_atual in status_geral:
+            status_geral[status_atual] += 1
+
         if status_atual == 'Concluido':
             dados_agrupados[obra_nome]["pontos_ppc"] += 1.0
         elif status_atual == 'Em Andamento':
-            perc = d.get('percentual', 0)
             try:
-                val_perc = float(perc) if perc else 0.0
+                val_perc = float(d.get('percentual', 0) or 0.0)
             except:
                 val_perc = 0.0
             dados_agrupados[obra_nome]["pontos_ppc"] += (val_perc / 100.0)
 
         for dia in ['seg', 'ter', 'qua', 'qui', 'sex']:
-            rec_val = d.get(f'rec_{dia}')
-            feito_val = d.get(f'feito_{dia}')
-            if rec_val and str(rec_val).strip() != '':
+            if d.get(f'rec_{dia}') and str(d.get(f'rec_{dia}')).strip() != '':
                 dados_agrupados[obra_nome]["dias_prog"] += 1
-                if feito_val is True:
+                if d.get(f'feito_{dia}') is True:
                     dados_agrupados[obra_nome]["dias_exec"] += 1
 
-        if status_atual in ['Nao Concluido', 'Em Andamento']:
+        if status_atual in ['Nao Concluido', 'Em Andamento'] and d.get('causa'):
             causa = d.get('causa')
-            if causa:
-                contagem_causas[causa] = contagem_causas.get(causa, 0) + 1
+            contagem_causas[causa] = contagem_causas.get(causa, 0) + 1
 
     nomes_obras = list(dados_agrupados.keys())
-    ppc_obras = []
-    pap_obras = []
+    ppc_obras, pap_obras = [], []
 
     for nome in nomes_obras:
         tot_atv = dados_agrupados[nome]["atividades_totais"]
@@ -157,66 +163,88 @@ def gerar_pdf_semanal(data_ref_str):
         d_prog = dados_agrupados[nome]["dias_prog"]
         d_exec = dados_agrupados[nome]["dias_exec"]
 
-        val_ppc = (pts / tot_atv * 100) if tot_atv > 0 else 0.0
-        val_pap = (d_exec / d_prog * 100) if d_prog > 0 else 0.0
+        ppc_obras.append((pts / tot_atv * 100) if tot_atv > 0 else 0.0)
+        pap_obras.append((d_exec / d_prog * 100) if d_prog > 0 else 0.0)
 
-        ppc_obras.append(val_ppc)
-        pap_obras.append(val_pap)
+    plt.rcParams['font.family'] = 'sans-serif'
+    fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+    fig.patch.set_facecolor('#ffffff')
 
     x = np.arange(len(nomes_obras))
     width = 0.35
-
-    fig1, ax1 = plt.subplots(figsize=(10, 5))
-    rects1 = ax1.bar(x - width/2, ppc_obras, width, label='PPC', color='#E37026')
-    rects2 = ax1.bar(x + width/2, pap_obras, width, label='PAP', color='#3468fa')
-
-    ax1.set_ylabel('Porcentagem (%)', fontweight='bold', color='#333333')
-    ax1.set_title('PPC e PAP por Obra', fontweight='bold', color='#0a0a0a', fontsize=14, pad=15)
+    ax1 = axs[0, 0]
+    ax1.grid(axis='y', linestyle='--', alpha=0.7, color='#E5E7EB')
+    rects1 = ax1.bar(x - width/2, ppc_obras, width, label='PPC', color='#E37026', zorder=3)
+    rects2 = ax1.bar(x + width/2, pap_obras, width, label='PAP', color='#1E3A8A', zorder=3)
+    ax1.set_title('PPC e PAP por Obra', fontweight='bold', color='#1E3A8A', fontsize=12)
     ax1.set_xticks(x)
-    ax1.set_xticklabels([n[:15] for n in nomes_obras], rotation=0, ha='center', fontweight='bold')
-    ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2, frameon=False)
+    ax1.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', color='#4B5563')
     ax1.set_ylim(0, 115)
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
-
-    def autolabel(rects):
+    ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2, frameon=False)
+    
+    for rects in [rects1, rects2]:
         for rect in rects:
             height = rect.get_height()
-            ax1.annotate(f'{height:.0f}%',
-                         xy=(rect.get_x() + rect.get_width() / 2, height),
-                         xytext=(0, 3),
-                         textcoords="offset points",
-                         ha='center', va='bottom', fontweight='bold', fontsize=9, color='#333333')
+            ax1.text(rect.get_x() + rect.get_width() / 2, height + 2, f'{height:.0f}%', 
+                     ha='center', va='bottom', fontweight='bold', fontsize=9, color='#1F2937')
 
-    autolabel(rects1)
-    autolabel(rects2)
-
-    plt.tight_layout()
-    tmp1 = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-    plt.savefig(tmp1.name, dpi=300, bbox_inches='tight')
-    plt.close(fig1)
-
-    fig2, ax2 = plt.subplots(figsize=(10, 4))
-    if contagem_causas:
-        causas_ordenadas = sorted(contagem_causas.items(), key=lambda x: x[1], reverse=False)[-7:]
-        labels = [c[0][:30] for c in causas_ordenadas]
-        valores = [c[1] for c in causas_ordenadas]
-        ax2.barh(labels, valores, color='#E37026', height=0.6)
-        ax2.spines['top'].set_visible(False)
-        ax2.spines['right'].set_visible(False)
-        ax2.set_xlabel('Quantidade de Ocorrencias (Top 7)', fontweight='bold', color='#333333')
-        ax2.set_title('Principais Restricoes Gerais', fontweight='bold', color='#0a0a0a', fontsize=14, pad=15)
-
-        for i, v in enumerate(valores):
-            ax2.text(v + 0.1, i, str(v), ha='left', va='center', fontweight='bold', color='#333333')
+    ax2 = axs[0, 1]
+    labels_st = [k for k, v in status_geral.items() if v > 0]
+    sizes_st = [v for v in status_geral.values() if v > 0]
+    cores_st = {'Concluido': '#4ADE80', 'Em Andamento': '#E37026', 'Nao Concluido': '#EF4444', 'A Iniciar': '#9CA3AF'}
+    cores_usadas = [cores_st[l] for l in labels_st]
+    
+    if sizes_st:
+        wedges, texts, autotexts = ax2.pie(sizes_st, labels=labels_st, colors=cores_usadas, autopct='%1.1f%%', 
+                                           startangle=90, pctdistance=0.75, wedgeprops=dict(width=0.4, edgecolor='w'))
+        plt.setp(texts, fontweight='bold', color='#4B5563')
+        plt.setp(autotexts, fontweight='bold', color='white')
+        ax2.set_title('Status Geral das Atividades', fontweight='bold', color='#1E3A8A', fontsize=12)
     else:
-        ax2.text(0.5, 0.5, "Nenhum problema registrado", ha='center', va='center', fontweight='bold')
+        ax2.text(0.5, 0.5, "Sem Dados", ha='center', va='center', fontweight='bold', color='#9CA3AF')
         ax2.axis('off')
 
-    plt.tight_layout()
-    tmp2 = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-    plt.savefig(tmp2.name, dpi=300, bbox_inches='tight')
-    plt.close(fig2)
+    ax3 = axs[1, 0]
+    ax3.grid(axis='x', linestyle='--', alpha=0.7, color='#E5E7EB')
+    if contagem_causas:
+        causas_ord = sorted(contagem_causas.items(), key=lambda x: x[1], reverse=False)[-5:]
+        y_pos = np.arange(len(causas_ord))
+        ax3.barh(y_pos, [c[1] for c in causas_ord], color='#EF4444', zorder=3)
+        ax3.set_yticks(y_pos)
+        ax3.set_yticklabels([c[0][:25] + "..." if len(c[0])>25 else c[0] for c in causas_ord], fontweight='bold', color='#4B5563')
+        ax3.set_title('Principais Restrições/Motivos (Geral)', fontweight='bold', color='#1E3A8A', fontsize=12)
+        for i, v in enumerate([c[1] for c in causas_ord]):
+            ax3.text(v + 0.1, i, str(v), va='center', fontweight='bold', color='#1F2937')
+    else:
+        ax3.text(0.5, 0.5, "Nenhum problema registrado", ha='center', va='center', fontweight='bold', color='#9CA3AF')
+    ax3.spines['top'].set_visible(False)
+    ax3.spines['right'].set_visible(False)
+
+    ax4 = axs[1, 1]
+    ax4.grid(axis='y', linestyle='--', alpha=0.7, color='#E5E7EB')
+    obras_rest = list(restricoes_por_obra.keys())
+    vol_rest = [len(restricoes_por_obra[o]) for o in obras_rest]
+    
+    if vol_rest and sum(vol_rest) > 0:
+        x_rest = np.arange(len(obras_rest))
+        rects4 = ax4.bar(x_rest, vol_rest, color='#F59E0B', width=0.5, zorder=3)
+        ax4.set_xticks(x_rest)
+        ax4.set_xticklabels([o[:15] for o in obras_rest], fontweight='bold', color='#4B5563')
+        ax4.set_title('Volume de Restrições Ativas por Obra', fontweight='bold', color='#1E3A8A', fontsize=12)
+        for rect in rects4:
+            height = rect.get_height()
+            ax4.text(rect.get_x() + rect.get_width() / 2, height + 0.1, str(height), ha='center', va='bottom', fontweight='bold', color='#1F2937')
+    else:
+        ax4.text(0.5, 0.5, "Nenhuma restrição registrada", ha='center', va='center', fontweight='bold', color='#9CA3AF')
+    ax4.spines['top'].set_visible(False)
+    ax4.spines['right'].set_visible(False)
+
+    plt.tight_layout(pad=4.0)
+    tmp_dash = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+    plt.savefig(tmp_dash.name, dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
     pdf = FPDF()
     pdf.add_page()
@@ -225,37 +253,29 @@ def gerar_pdf_semanal(data_ref_str):
         pdf.image('logo.png', x=10, y=8, w=30)
     except:
         pass
-
-    pdf.set_font("Arial", size=16, style='B')
-    pdf.set_text_color(10, 10, 10)
-    pdf.cell(0, 10, txt="Relatorio Semanal Planejamento", ln=True, align='C')
-
-    pdf.set_font("Arial", size=12)
+    pdf.set_font("Arial", size=18, style='B')
+    pdf.set_text_color(30, 58, 138)
+    pdf.cell(0, 10, txt="DASHBOARD GERENCIAL - LAVIE", ln=True, align='C')
+    pdf.set_font("Arial", size=11)
     pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 8, txt=f"Semana de Referencia: {data_ref_str}", ln=True, align='C')
-    pdf.ln(10)
-
-    pdf.image(tmp1.name, x=10, y=35, w=190)
-    pdf.ln(105)
-    pdf.image(tmp2.name, x=10, y=145, w=190)
-
-    os.remove(tmp1.name)
-    os.remove(tmp2.name)
-
-    pdf.add_page()
-    pdf.set_font("Arial", size=14, style='B')
-    pdf.set_text_color(10, 10, 10)
-    pdf.cell(0, 10, txt="Detalhamento das Atividades", ln=True, align='C')
+    pdf.cell(0, 6, txt=f"Semana de Referencia: {data_ref_str} | Central de Planejamento", ln=True, align='C')
     pdf.ln(5)
 
-    for obra, dados_obra in dados_agrupados.items():
-        atividades = dados_obra["lista_atividades"]
+    pdf.image(tmp_dash.name, x=5, y=35, w=200)
+    os.remove(tmp_dash.name)
+    for obra in nomes_obras:
+        pdf.add_page()
+        
+        pdf.set_font("Arial", size=14, style='B')
+        pdf.set_text_color(30, 58, 138)
+        pdf.cell(0, 10, txt=f"OBRA: {obra.upper()}", ln=True, align='L', border='B')
+        pdf.ln(5)
 
-        pdf.set_font("Arial", size=12, style='B')
+        pdf.set_font("Arial", size=11, style='B')
         pdf.set_text_color(227, 112, 38)
-        pdf.cell(0, 10, txt=f"Obra: {obra}", ln=True, align='L')
-
-        pdf.set_fill_color(10, 10, 10)
+        pdf.cell(0, 8, txt="1. Status da Programação Semanal", ln=True)
+        
+        pdf.set_fill_color(30, 58, 138)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", size=9, style='B')
         pdf.cell(40, 8, txt="Local", border=1, fill=True)
@@ -263,26 +283,49 @@ def gerar_pdf_semanal(data_ref_str):
         pdf.cell(60, 8, txt="Detalhe", border=1, fill=True)
         pdf.cell(30, 8, txt="Status", border=1, fill=True, ln=True, align='C')
 
-        pdf.set_text_color(0, 0, 0)
+        pdf.set_text_color(50, 50, 50)
         pdf.set_font("Arial", size=8)
         
-        for atv in atividades:
-            raw_local = str(atv.get('local', ''))
-            raw_ativ = str(atv.get('atividade', ''))
-            raw_det = str(atv.get('detalhe', ''))
-            raw_stat = str(atv.get('status', ''))
+        for atv in dados_agrupados[obra]["lista_atividades"]:
+            loc = str(atv.get('local', ''))
+            ati = str(atv.get('atividade', ''))
+            det = str(atv.get('detalhe', ''))
+            sta = str(atv.get('status', ''))
 
-            local = raw_local[:22] + "..." if len(raw_local) > 22 else raw_local
-            atividade = raw_ativ[:32] + "..." if len(raw_ativ) > 32 else raw_ativ
-            detalhe = raw_det[:32] + "..." if len(raw_det) > 32 else raw_det
-            status = raw_stat[:15]
-
-            pdf.cell(40, 7, txt=local, border=1)
-            pdf.cell(60, 7, txt=atividade, border=1)
-            pdf.cell(60, 7, txt=detalhe, border=1)
-            pdf.cell(30, 7, txt=status, border=1, ln=True, align='C')
+            pdf.cell(40, 7, txt=loc[:22] + "..." if len(loc) > 22 else loc, border=1)
+            pdf.cell(60, 7, txt=ati[:32] + "..." if len(ati) > 32 else ati, border=1)
+            pdf.cell(60, 7, txt=det[:32] + "..." if len(det) > 32 else det, border=1)
+            pdf.cell(30, 7, txt=sta[:15], border=1, ln=True, align='C')
             
-        pdf.ln(5)
+        pdf.ln(10)
+
+        restricoes_desta_obra = restricoes_por_obra.get(obra, [])
+        if restricoes_desta_obra:
+            pdf.set_font("Arial", size=11, style='B')
+            pdf.set_text_color(227, 112, 38)
+            pdf.cell(0, 8, txt="2. Quadro de Restrições Ativas", ln=True)
+            
+            pdf.set_fill_color(30, 58, 138)
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_font("Arial", size=9, style='B')
+            pdf.cell(70, 8, txt="Descrição da Restrição", border=1, fill=True)
+            pdf.cell(45, 8, txt="Responsável", border=1, fill=True)
+            pdf.cell(35, 8, txt="Data Prevista", border=1, fill=True)
+            pdf.cell(40, 8, txt="Status", border=1, fill=True, ln=True, align='C')
+
+            pdf.set_text_color(50, 50, 50)
+            pdf.set_font("Arial", size=8)
+            
+            for rest in restricoes_desta_obra:
+                desc = str(rest.get('descricao', rest.get('restricao', '')))
+                resp = str(rest.get('responsavel', ''))
+                data_prev = str(rest.get('data_prevista', str(rest.get('data_limite', ''))))
+                stat_rest = str(rest.get('status', ''))
+
+                pdf.cell(70, 7, txt=desc[:40] + "..." if len(desc) > 40 else desc, border=1)
+                pdf.cell(45, 7, txt=resp[:25] + "..." if len(resp) > 25 else resp, border=1)
+                pdf.cell(35, 7, txt=data_prev[:15], border=1)
+                pdf.cell(40, 7, txt=stat_rest[:20], border=1, ln=True, align='C')
 
     try:
         return pdf.output(dest='S').encode('latin-1')
