@@ -299,7 +299,7 @@ def app(obra_id):
         return
 
     st.markdown("#### Lista de Atividades")
-    busca_atividade = st.text_input("🔍 Filtrar Atividades", placeholder="Digite o nome da atividade para buscar...")
+    busca_atividade = st.text_input("Filtrar Atividades", placeholder="Digite o nome da atividade para buscar...")
     st.markdown("<br>", unsafe_allow_html=True)
 
     if busca_atividade:
@@ -310,10 +310,10 @@ def app(obra_id):
     if df_view.empty:
         st.warning("Nenhuma atividade encontrada com este nome.")
     else:
-        cols = st.columns(3)
+        cols = st.columns(2)
         
         for i, (idx, row) in enumerate(df_view.iterrows()):
-            col_atual = cols[i % 3]
+            col_atual = cols[i % 2]
             with st.container():
                 with col_atual:
                     status_color = "#888" 
