@@ -169,6 +169,12 @@ def gerar_pdf_semanal(data_ref_str):
     except:
         legenda_semana = f"Semana: {data_ref_str}"
 
+    try:
+        pdf = FPDF(orientation='L', unit='mm', format='A4')
+        pdf.add_page()
+        try: pdf.image("Lavie.png", x=10, y=5, w=35)
+        except: pass 
+
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['text.color'] = '#374151'
     plt.rcParams['axes.labelcolor'] = '#374151'
@@ -242,7 +248,6 @@ def gerar_pdf_semanal(data_ref_str):
         x_rest = np.arange(len(obras_rest))
         rects4 = ax4.bar(x_rest, vol_rest, color='#374151', width=0.5, zorder=3)
         ax4.set_xticks(x_rest)
-        # ROTAÇÃO APLICADA AQUI
         ax4.set_xticklabels([o[:15] for o in obras_rest], fontweight='bold', rotation=45, ha='right')
         ax4.set_title('Volume de Restricoes Ativas', fontweight='bold', color='#374151', fontsize=12)
         for rect in rects4:
@@ -269,7 +274,7 @@ def gerar_pdf_semanal(data_ref_str):
         pass
     pdf.set_font("Arial", size=18, style='B')
     pdf.set_text_color(55, 65, 81)
-    pdf.cell(0, 10, txt="DASHBOARD GERENCIAL - LAVIE", ln=True, align='C')
+    pdf.cell(0, 10, txt="RELATORIO SEMANAL - LAVIE", ln=True, align='C')
     pdf.set_font("Arial", size=11)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(0, 6, txt=f"Semana de Referencia: {data_ref_str} | Central de Planejamento", ln=True, align='C')
