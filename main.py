@@ -266,13 +266,13 @@ def gerar_pdf_semanal(data_ref_str):
     pdf.add_page()
 
     try:
-        pdf.image('assets/logo.png', x=15, y=15, w=50)
+        pdf.image('assets/logo.png', x=15, y=20, w=60)
     except:
         pass
     
     pdf.set_font("Arial", size=22, style='B')
     pdf.set_text_color(31, 41, 55) 
-    pdf.cell(0, 12, txt="RELATÓRIO SEMANAL - LAVIE", ln=True, align='R')
+    pdf.cell(0, 12, txt="RELATÓRIO SEMANAL", ln=True, align='R')
     
     pdf.set_font("Arial", size=12)
     pdf.set_text_color(107, 114, 128) 
