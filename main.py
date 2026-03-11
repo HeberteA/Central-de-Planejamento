@@ -266,7 +266,7 @@ def gerar_pdf_semanal(data_ref_str):
     pdf.add_page()
 
     try:
-        pdf.image('assets/logo.png', x=15, y=20, w=60)
+        pdf.image('assets/logo.png', x=15, y=17, w=55)
     except:
         pass
     
