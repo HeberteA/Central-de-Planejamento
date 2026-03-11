@@ -212,7 +212,7 @@ def gerar_pdf_semanal(data_ref_str):
 
     ax1 = axs[0, 0]
     ax1.grid(axis='y', linestyle='-', alpha=0.3, color='#D1D5DB')
-    rects1 = ax1.bar(x, ppc_obras, width, label=legenda_semana, color='#E37026', zorder=3)
+    rects1 = ax1.bar(x, ppc_obras, width, color='#E37026', zorder=3)
     ax1.set_title('PPC por Obra (%)', fontweight='bold', color='#111827', fontsize=14, pad=15)
     ax1.set_xticks(x)
     ax1.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', rotation=45, ha='right')
@@ -225,7 +225,7 @@ def gerar_pdf_semanal(data_ref_str):
 
     ax2 = axs[0, 1]
     ax2.grid(axis='y', linestyle='-', alpha=0.3, color='#D1D5DB')
-    rects2 = ax2.bar(x, pap_obras, width, label=legenda_semana, color='#374151', zorder=3)
+    rects2 = ax2.bar(x, pap_obras, width, color='#374151', zorder=3)
     ax2.set_title('PAP por Obra (%)', fontweight='bold', color='#111827', fontsize=14, pad=15)
     ax2.set_xticks(x)
     ax2.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', rotation=45, ha='right')
