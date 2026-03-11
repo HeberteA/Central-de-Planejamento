@@ -176,13 +176,28 @@ def gerar_pdf_semanal(data_ref_str):
     except:
         legenda_semana = f"Semana: {data_ref_str}"
 
+    ppc_geral = np.mean(ppc_obras) if ppc_obras else 0.0
+    pap_geral = np.mean(pap_obras) if pap_obras else 0.0
+    tot_atividades_geral = sum(dados_agrupados[o]["atividades_totais"] for o in nomes_obras)
+    
+    tot_restricoes_removidas = 0
+    tot_restricoes_ativas = 0
+    status_resolvidos = ['removida', 'resolvida', 'concluida', 'concluído']
+    
+    for r in dados_rest:
+        st = str(r.get('status', '')).strip().lower()
+        if st in status_resolvidos:
+            tot_restricoes_removidas += 1
+        else:
+            tot_restricoes_ativas += 1
+
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['text.color'] = '#374151'
     plt.rcParams['axes.labelcolor'] = '#374151'
     plt.rcParams['xtick.color'] = '#374151'
     plt.rcParams['ytick.color'] = '#374151'
     
-    fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+    fig, axs = plt.subplots(2, 2, figsize=(14, 9.5))
     fig.patch.set_facecolor('#ffffff')
 
     x = np.arange(len(nomes_obras))
@@ -197,28 +212,26 @@ def gerar_pdf_semanal(data_ref_str):
 
     ax1 = axs[0, 0]
     ax1.grid(axis='y', linestyle='-', alpha=0.3, color='#D1D5DB')
-    rects1 = ax1.bar(x, ppc_obras, width, color='#E37026', zorder=3)
+    rects1 = ax1.bar(x, ppc_obras, width, label=legenda_semana, color='#E37026', zorder=3)
     ax1.set_title('PPC por Obra (%)', fontweight='bold', color='#111827', fontsize=14, pad=15)
     ax1.set_xticks(x)
     ax1.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', rotation=45, ha='right')
     ax1.set_ylim(0, 115)
     clean_ax(ax1)
     ax1.legend(loc='upper right', frameon=False)
-    
     for rect in rects1:
         height = rect.get_height()
         ax1.text(rect.get_x() + rect.get_width() / 2, height + 2, f'{height:.0f}%', ha='center', va='bottom', fontweight='bold', fontsize=10)
 
     ax2 = axs[0, 1]
     ax2.grid(axis='y', linestyle='-', alpha=0.3, color='#D1D5DB')
-    rects2 = ax2.bar(x, pap_obras, width, color='#374151', zorder=3)
+    rects2 = ax2.bar(x, pap_obras, width, label=legenda_semana, color='#374151', zorder=3)
     ax2.set_title('PAP por Obra (%)', fontweight='bold', color='#111827', fontsize=14, pad=15)
     ax2.set_xticks(x)
     ax2.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', rotation=45, ha='right')
     ax2.set_ylim(0, 115)
     clean_ax(ax2)
     ax2.legend(loc='upper right', frameon=False)
-    
     for rect in rects2:
         height = rect.get_height()
         ax2.text(rect.get_x() + rect.get_width() / 2, height + 2, f'{height:.0f}%', ha='center', va='bottom', fontweight='bold', fontsize=10)
@@ -241,19 +254,47 @@ def gerar_pdf_semanal(data_ref_str):
     ax4 = axs[1, 1]
     ax4.grid(axis='y', linestyle='-', alpha=0.3, color='#D1D5DB')
     obras_rest = list(restricoes_por_obra.keys())
-    vol_rest = [len(restricoes_por_obra[o]) for o in obras_rest]
     
-    if vol_rest and sum(vol_rest) > 0:
+    vol_ativas = []
+    vol_removidas = []
+    
+    for o in obras_rest:
+        ativas = 0
+        removidas = 0
+        for r in restricoes_por_obra[o]:
+            st = str(r.get('status', '')).strip().lower()
+            if st in status_resolvidos:
+                removidas += 1
+            else:
+                ativas += 1
+        vol_ativas.append(ativas)
+        vol_removidas.append(removidas)
+    
+    if len(obras_rest) > 0 and (sum(vol_ativas) + sum(vol_removidas)) > 0:
         x_rest = np.arange(len(obras_rest))
-        rects4 = ax4.bar(x_rest, vol_rest, color='#374151', width=0.45, zorder=3)
+        
+        rects_ativas = ax4.bar(x_rest, vol_ativas, color='#E37026', width=0.45, zorder=3, label='Ativas')
+        rects_remov = ax4.bar(x_rest, vol_removidas, bottom=vol_ativas, color='#374151', width=0.45, zorder=3, label='Resolvidas/Removidas')
+        
         ax4.set_xticks(x_rest)
         ax4.set_xticklabels([o[:15] for o in obras_rest], fontweight='bold', rotation=45, ha='right')
-        ax4.set_title('Volume de Restrições Ativas', fontweight='bold', color='#111827', fontsize=14, pad=15)
-        for rect in rects4:
-            height = rect.get_height()
-            ax4.text(rect.get_x() + rect.get_width() / 2, height + 0.2, str(height), ha='center', va='bottom', fontweight='bold')
+        ax4.set_title('Restrições por Obra (Ativas vs Resolvidas)', fontweight='bold', color='#111827', fontsize=14, pad=15)
+        ax4.legend(loc='upper right', frameon=False, fontsize=10)
+        
+        for i in range(len(x_rest)):
+            v_a = vol_ativas[i]
+            v_r = vol_removidas[i]
+            x_pos = x_rest[i]
+            
+            if v_a > 0:
+                ax4.text(x_pos, v_a / 2, str(v_a), ha='center', va='center', fontweight='bold', color='white')
+            if v_r > 0:
+                ax4.text(x_pos, v_a + (v_r / 2), str(v_r), ha='center', va='center', fontweight='bold', color='white')
+        
+        max_total = max([a + r for a, r in zip(vol_ativas, vol_removidas)])
+        ax4.set_ylim(0, max_total * 1.2 if max_total > 0 else 5)
     else:
-        ax4.text(0.5, 0.5, "Nenhuma restrição ativa", ha='center', va='center', fontweight='bold', color='#9CA3AF')
+        ax4.text(0.5, 0.5, "Nenhuma restrição registrada", ha='center', va='center', fontweight='bold', color='#9CA3AF')
     clean_ax(ax4)
 
     plt.tight_layout(pad=4.0)
