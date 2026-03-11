@@ -266,7 +266,7 @@ def gerar_pdf_semanal(data_ref_str):
     pdf.add_page()
 
     try:
-        pdf.image('assets/logo.png', x=15, y=12, w=35)
+        pdf.image('assets/logo.png', x=15, y=15, w=50)
     except:
         pass
     
@@ -307,8 +307,8 @@ def gerar_pdf_semanal(data_ref_str):
     for obra in nomes_obras:
         pdf.add_page()
         
-        pdf.set_fill_color(243, 244, 246) 
-        pdf.set_draw_color(227, 112, 38) 
+        pdf.set_fill_color(243, 244, 246)
+        pdf.set_draw_color(227, 112, 38)
         pdf.set_line_width(0.5)
         pdf.rect(15, 15, 180, 12, 'DF')
         
@@ -316,7 +316,7 @@ def gerar_pdf_semanal(data_ref_str):
         pdf.set_text_color(31, 41, 55)
         pdf.set_xy(18, 17)
         pdf.cell(0, 8, txt=f"OBRA: {obra.upper()}", ln=True, align='L', border=0)
-        pdf.set_line_width(0.2) 
+        pdf.set_line_width(0.2)
         pdf.ln(10)
 
         pdf.set_font("Arial", size=12, style='B')
@@ -338,9 +338,9 @@ def gerar_pdf_semanal(data_ref_str):
 
         pdf.set_text_color(75, 85, 99)
         pdf.set_font("Arial", size=8)
-        pdf.set_draw_color(209, 213, 219) 
+        pdf.set_draw_color(209, 213, 219)
         
-        zebra_prog = False 
+        zebra_prog = False
         
         for atv in dados_agrupados[obra]["lista_atividades"]:
             loc = str(atv.get('local', ''))
@@ -360,7 +360,7 @@ def gerar_pdf_semanal(data_ref_str):
             if zebra_prog:
                 pdf.set_fill_color(249, 250, 251)
             else:
-                pdf.set_fill_color(255, 255, 255) 
+                pdf.set_fill_color(255, 255, 255)
             zebra_prog = not zebra_prog
             
             for i, txt in enumerate(textos_linha):
@@ -389,11 +389,11 @@ def gerar_pdf_semanal(data_ref_str):
             pdf.set_draw_color(55, 65, 81)
             pdf.set_font("Arial", size=9, style='B')
             
-            larguras_rest = [75, 40, 30, 35]
+            larguras_rest = [90, 50, 40]
             
             pdf.cell(larguras_rest[0], 9, txt=" Descrição da Restrição", border=1, fill=True)
             pdf.cell(larguras_rest[1], 9, txt=" Responsável", border=1, fill=True)
-            pdf.cell(larguras_rest[3], 9, txt="Status", border=1, fill=True, ln=True, align='C')
+            pdf.cell(larguras_rest[2], 9, txt="Status", border=1, fill=True, ln=True, align='C')
 
             pdf.set_text_color(75, 85, 99)
             pdf.set_font("Arial", size=8)
@@ -404,10 +404,9 @@ def gerar_pdf_semanal(data_ref_str):
             for rest in restricoes_desta_obra:
                 desc = str(rest.get('descricao', rest.get('restricao', '')))
                 resp = str(rest.get('responsavel', ''))
-                data_prev = str(rest.get('data_prevista', str(rest.get('data_limite', ''))))
                 stat_rest = str(rest.get('status', ''))
 
-                textos_rest = [desc, resp, data_prev, stat_rest]
+                textos_rest = [desc, resp, stat_rest]
                 h_linha = calcular_altura_linha(pdf, textos_rest, larguras_rest)
                 
                 if pdf.get_y() + h_linha > 270:
@@ -425,7 +424,7 @@ def gerar_pdf_semanal(data_ref_str):
                 for i, txt in enumerate(textos_rest):
                     pdf.rect(x_start, y_start, larguras_rest[i], h_linha, 'DF')
                     pdf.set_xy(x_start + 1, y_start + 2)
-                    alinhamento = 'C' if i in [2, 3] else 'L'
+                    alinhamento = 'C' if i == 2 else 'L'
                     pdf.multi_cell(larguras_rest[i] - 2, 5, txt, border=0, align=alinhamento)
                     x_start += larguras_rest[i]
                 
