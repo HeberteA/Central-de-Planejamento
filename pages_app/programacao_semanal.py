@@ -408,7 +408,7 @@ def app(obra_id):
                         if selected_causa and selected_causa in lista_problemas:
                             idx_causa = lista_problemas.index(selected_causa)
 
-                        st.selectbox(
+                        _causa_selecionada = st.selectbox(
                             "Motivo / Problema:",
                             lista_problemas,
                             index=idx_causa,
@@ -420,7 +420,7 @@ def app(obra_id):
                         db_obs = row.get('observacao', '')
                         if pd.isna(db_obs): db_obs = ""
 
-                        st.text_area(
+                        _obs_digitada = st.text_area(
                             "Observação:",
                             value=db_obs,
                             key=f"obs_{row['id']}",
