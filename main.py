@@ -93,7 +93,7 @@ def gerar_pdf_semanal(data_ref_str):
     import tempfile
     import os
     from fpdf import FPDF
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     def s(txt):
         if txt is None:
@@ -199,7 +199,8 @@ def gerar_pdf_semanal(data_ref_str):
 
     try:
         data_obj = datetime.strptime(data_ref_str, "%Y-%m-%d")
-        legenda_semana = f"Semana: {data_obj.strftime('%d/%m/%Y')}"
+        data_fim_obj = data_obj + timedelta(days=4)
+        legenda_semana = f"Semana: {data_obj.strftime('%d/%m/%Y')} a {data_fim_obj.strftime('%d/%m/%Y')}"
     except:
         legenda_semana = f"Semana: {data_ref_str}"
 
@@ -413,11 +414,12 @@ def gerar_pdf_semanal(data_ref_str):
         _ = pdf.set_draw_color(55, 65, 81)
         _ = pdf.set_font("Arial", size=9, style='B')
         
-        larguras_prog = [35, 45, 75, 25]
-        _ = pdf.cell(larguras_prog[0], 8, txt=s(" Local"), border=1, fill=True)
-        _ = pdf.cell(larguras_prog[1], 8, txt=s(" Atividade"), border=1, fill=True)
-        _ = pdf.cell(larguras_prog[2], 8, txt=s(" Detalhe"), border=1, fill=True)
-        _ = pdf.cell(larguras_prog[3], 8, txt=s("Status"), border=1, fill=True, ln=True, align='C')
+        # Novas larguras da tabela: Atividade, Detalhe, Status, Motivo/Problema
+        larguras_prog = [45, 65, 25, 45]
+        _ = pdf.cell(larguras_prog[0], 8, txt=s(" Atividade"), border=1, fill=True)
+        _ = pdf.cell(larguras_prog[1], 8, txt=s(" Detalhe"), border=1, fill=True)
+        _ = pdf.cell(larguras_prog[2], 8, txt=s("Status"), border=1, fill=True, align='C')
+        _ = pdf.cell(larguras_prog[3], 8, txt=s(" Motivo/Problema"), border=1, fill=True, ln=True)
 
         _ = pdf.set_text_color(75, 85, 99)
         _ = pdf.set_font("Arial", size=8)
@@ -425,7 +427,16 @@ def gerar_pdf_semanal(data_ref_str):
         zebra_prog = False
         
         for atv in dados_agrupados[obra]["lista_atividades"]:
-            textos_linha = [s(atv.get('local', '')), s(atv.get('atividade', '')), s(atv.get('detalhe', '')), s(atv.get('status', ''))]
+            # Só exibe o motivo se a tarefa não foi concluída
+            motivo_txt = s(atv.get('causa', '')) if atv.get('status') in ['Nao Concluido', 'Em Andamento'] else ''
+            
+            textos_linha = [
+                s(atv.get('atividade', '')), 
+                s(atv.get('detalhe', '')), 
+                s(atv.get('status', '')), 
+                motivo_txt
+            ]
+            
             h_linha = calcular_altura_linha(pdf, textos_linha, larguras_prog)
             
             if pdf.get_y() + h_linha > 270:
@@ -438,54 +449,11 @@ def gerar_pdf_semanal(data_ref_str):
             for i, txt in enumerate(textos_linha):
                 _ = pdf.rect(x_start, y_start, larguras_prog[i], h_linha, 'DF')
                 _ = pdf.set_xy(x_start + 1, y_start + 2)
-                _ = pdf.multi_cell(larguras_prog[i] - 2, 5, txt, border=0, align='C' if i == 3 else 'L')
+                _ = pdf.multi_cell(larguras_prog[i] - 2, 5, txt, border=0, align='C' if i == 2 else 'L')
                 x_start += larguras_prog[i]
             _ = pdf.set_xy(15, y_start + h_linha)
             
         _ = pdf.ln(8)
-
-        restricoes_desta_obra = restricoes_por_obra.get(obra, {}).get('lista', [])
-        if restricoes_desta_obra:
-            if pdf.get_y() > 220:
-                _ = pdf.add_page()
-                
-            _ = pdf.set_font("Arial", size=10, style='B')
-            _ = pdf.set_text_color(227, 112, 38)
-            _ = pdf.cell(0, 6, txt=s("Quadro de Restricoes Ativas"), ln=True)
-            _ = pdf.ln(1)
-            
-            _ = pdf.set_fill_color(55, 65, 81)
-            _ = pdf.set_text_color(255, 255, 255)
-            _ = pdf.set_draw_color(55, 65, 81)
-            _ = pdf.set_font("Arial", size=9, style='B')
-            
-            larguras_rest = [90, 50, 40]
-            _ = pdf.cell(larguras_rest[0], 8, txt=s(" Descricao da Restricao"), border=1, fill=True)
-            _ = pdf.cell(larguras_rest[1], 8, txt=s(" Responsavel"), border=1, fill=True)
-            _ = pdf.cell(larguras_rest[2], 8, txt=s("Status"), border=1, fill=True, ln=True, align='C')
-
-            _ = pdf.set_text_color(75, 85, 99)
-            _ = pdf.set_font("Arial", size=8)
-            _ = pdf.set_draw_color(209, 213, 219)
-            zebra_rest = False
-            
-            for rest in restricoes_desta_obra:
-                textos_rest = [s(rest.get('descricao', rest.get('restricao', ''))), s(rest.get('responsavel', '')), s(rest.get('status', ''))]
-                h_linha = calcular_altura_linha(pdf, textos_rest, larguras_rest)
-                
-                if pdf.get_y() + h_linha > 270:
-                    _ = pdf.add_page()
-
-                x_start, y_start = pdf.get_x(), pdf.get_y()
-                _ = pdf.set_fill_color(249, 250, 251) if zebra_rest else pdf.set_fill_color(255, 255, 255)
-                zebra_rest = not zebra_rest
-                
-                for i, txt in enumerate(textos_rest):
-                    _ = pdf.rect(x_start, y_start, larguras_rest[i], h_linha, 'DF')
-                    _ = pdf.set_xy(x_start + 1, y_start + 2)
-                    _ = pdf.multi_cell(larguras_rest[i] - 2, 5, txt, border=0, align='C' if i == 2 else 'L')
-                    x_start += larguras_rest[i]
-                _ = pdf.set_xy(15, y_start + h_linha)
 
     try:
         return pdf.output(dest='S').encode('latin-1')
