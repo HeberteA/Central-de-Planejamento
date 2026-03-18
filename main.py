@@ -228,7 +228,7 @@ def gerar_pdf_semanal(data_ref_str):
     _ = ax1.grid(axis='y', linestyle='-', alpha=0.3, color='#D1D5DB')
     ppcs = [metricas_obras[n]["PPC"] for n in nomes_obras]
     rects1 = ax1.bar(x, ppcs, width, color='#E37026', zorder=3)
-    _ = ax1.axhline(y=80, color='#E37026', linestyle='-', linewidth=1.5, label='META: 80%', zorder=4, alpha=0.7)
+    _ = ax1.axhline(y=80, color='#E37026', linestyle='-', linewidth=1.5, label='META: 80%', zorder=2, alpha=0.7)
     
     _ = ax1.set_title('PPC(%) por OBRAS e SEMANAS', fontweight='bold', color='#111827', fontsize=12, pad=10)
     _ = ax1.set_xticks(x)
@@ -238,12 +238,14 @@ def gerar_pdf_semanal(data_ref_str):
     _ = ax1.legend(loc='upper right', frameon=False, fontsize=9)
     for rect in rects1:
         height = rect.get_height()
-        _ = ax1.text(rect.get_x() + rect.get_width() / 2, height + 2, f'{height:.0f}%', ha='center', va='bottom', fontweight='bold', fontsize=9)
+        _ = ax1.text(rect.get_x() + rect.get_width() / 2, height + 2, f'{height:.0f}%', 
+                     ha='center', va='bottom', fontweight='bold', fontsize=9, zorder=5,
+                     bbox=dict(facecolor='white', edgecolor='none', pad=1, alpha=0.8))
 
     _ = ax2.grid(axis='y', linestyle='-', alpha=0.3, color='#D1D5DB')
     paps = [metricas_obras[n]["PAP"] for n in nomes_obras]
     rects2 = ax2.bar(x, paps, width, color='#374151', zorder=3)
-    _ = ax2.axhline(y=80, color='#374151', linestyle='-', linewidth=1.5, label='META: 80%', zorder=4, alpha=0.7)
+    _ = ax2.axhline(y=80, color='#374151', linestyle='-', linewidth=1.5, label='META: 80%', zorder=2, alpha=0.7)
     _ = ax2.set_title('MEDIO PRAZO/PAP (%) por Obra', fontweight='bold', color='#111827', fontsize=12, pad=10)
     _ = ax2.set_xticks(x)
     _ = ax2.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', rotation=45, ha='right', fontsize=9)
@@ -289,6 +291,16 @@ def gerar_pdf_semanal(data_ref_str):
         _ = ax4.set_title('Restricoes por Obra', fontweight='bold', color='#111827', fontsize=12, pad=10)
         _ = ax4.legend(loc='upper right', frameon=False, fontsize=9)
         clean_ax(ax4)
+        
+        for i in range(len(x_rest)):
+            v_a = vol_ativas[i]
+            v_r = vol_removidas[i]
+            x_pos = x_rest[i]
+            
+            if v_a > 0:
+                _ = ax4.text(x_pos, v_a / 2, str(v_a), ha='center', va='center', fontweight='bold', color='white', zorder=5)
+            if v_r > 0:
+                _ = ax4.text(x_pos, v_a + (v_r / 2), str(v_r), ha='center', va='center', fontweight='bold', color='white', zorder=5)
     else:
         _ = ax4.text(0.5, 0.5, "Nenhuma restricao registrada", ha='center', va='center', fontweight='bold', color='#9CA3AF')
         clean_ax(ax4)
