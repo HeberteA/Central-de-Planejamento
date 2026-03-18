@@ -227,7 +227,7 @@ def gerar_pdf_semanal(data_ref_str):
 
     _ = ax1.grid(axis='y', linestyle='-', alpha=0.3, color='#D1D5DB')
     ppcs = [metricas_obras[n]["PPC"] for n in nomes_obras]
-    rects1 = ax1.bar(x, ppcs, width, label='Atual', color='#E37026', zorder=3)
+    rects1 = ax1.bar(x, ppcs, width, color='#E37026', zorder=3)
     _ = ax1.axhline(y=80, color='#E37026', linestyle='-', linewidth=1.5, label='META: 80%', zorder=4, alpha=0.7)
     
     _ = ax1.set_title('PPC(%) por OBRAS e SEMANAS', fontweight='bold', color='#111827', fontsize=12, pad=10)
@@ -243,6 +243,7 @@ def gerar_pdf_semanal(data_ref_str):
     _ = ax2.grid(axis='y', linestyle='-', alpha=0.3, color='#D1D5DB')
     paps = [metricas_obras[n]["PAP"] for n in nomes_obras]
     rects2 = ax2.bar(x, paps, width, color='#374151', zorder=3)
+    _ = ax2.axhline(y=80, color='#374151', linestyle='-', linewidth=1.5, label='META: 80%', zorder=4, alpha=0.7)
     _ = ax2.set_title('MEDIO PRAZO/PAP (%) por Obra', fontweight='bold', color='#111827', fontsize=12, pad=10)
     _ = ax2.set_xticks(x)
     _ = ax2.set_xticklabels([n[:15] for n in nomes_obras], fontweight='bold', rotation=45, ha='right', fontsize=9)
