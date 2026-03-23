@@ -7,14 +7,16 @@ from modules import database
 from modules import ui
 
 LAVIE_PALETTE = [
-    "#E37026", 
-    "#CA6422",
-    "#B1581E",
-    "#984B19",
-    "#803F15",
-    "#673311",
-    "#4E260D",
-    "#351A09"
+    "#E37026", # Laranja Lavie (Principal)
+    "#3B82F6", # Azul Vibrante
+    "#10B981", # Verde Esmeralda
+    "#8B5CF6", # Roxo
+    "#F59E0B", # Amarelo/Âmbar
+    "#EF4444", # Vermelho
+    "#14B8A6", # Teal (Azul Esverdeado)
+    "#EC4899", # Rosa
+    "#6366F1", # Indigo
+    "#84CC16"  # Verde Limão
 ]
 
 BG_COLOR = 'rgba(0,0,0,0)'
