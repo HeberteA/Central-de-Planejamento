@@ -32,7 +32,6 @@ def load_data(supabase, obra_id, start_date, end_date):
     def apply_query(table, date_col):
         try:
             q = supabase.table(table).select("*")
-            # CORREÇÃO AQUI: Só aplica o filtro se tiver obra_id E se for diferente de "todos"
             if obra_id and obra_id != "todos": 
                 q = q.eq("obra_id", obra_id)
             if date_col:
@@ -159,13 +158,7 @@ def app(obra_id_param):
         c_filter, c_date = st.columns([1, 1])
         with c_filter:
             try:
-                query_indicadores = supabase.table("pcp_historico_indicadores").select("*")
-                
-                # CORREÇÃO: Aplica filtro só se não for "todos"
-                if obra_id and obra_id != "todos":
-                    query_indicadores = query_indicadores.eq("obra_id", obra_id)
-                
-                obras_resp = query_indicadores.execute()
+                obras_resp = supabase.table("pcp_obras").select("id, nome").order("nome").execute()
             
                 opcoes = {"TODAS AS OBRAS": "todos"} 
                 
