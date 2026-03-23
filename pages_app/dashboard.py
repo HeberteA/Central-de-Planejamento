@@ -157,7 +157,12 @@ def app(obra_id_param):
         c_filter, c_date = st.columns([1, 1])
         with c_filter:
             try:
-                obras_resp = supabase.table("pcp_obras").select("id, nome").order("nome").execute()
+                query_indicadores = supabase.table("pcp_historico_indicadores").select("*")
+                
+                if obra_id and obra_id != "todos":
+                    query_indicadores = query_indicadores.eq("obra_id", obra_id)
+                
+                obras_resp = query_indicadores.execute()
             
                 opcoes = {"TODAS AS OBRAS": "todos"} 
                 
