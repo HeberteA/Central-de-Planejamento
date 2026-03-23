@@ -158,19 +158,25 @@ def app(obra_id_param):
         with c_filter:
             try:
                 obras_resp = supabase.table("pcp_obras").select("id, nome").order("nome").execute()
+            
+                opcoes = {"TODAS AS OBRAS": "todos"} 
+                
                 if obras_resp.data:
-                    opcoes = {"TODAS AS OBRAS": None}
                     for o in obras_resp.data:
                         opcoes[o['nome']] = o['id']
-                    
-                    idx_selecionado = 0
-                    if obra_id_param in opcoes.values():
-                        nome_atual = [k for k, v in opcoes.items() if v == obra_id_param][0]
-                        idx_selecionado = list(opcoes.keys()).index(nome_atual)
-                    
-                    selected_nome = st.selectbox("Obra:", list(opcoes.keys()), index=idx_selecionado)
-                    obra_id = opcoes[selected_nome]
-            except: pass
+                
+                idx_selecionado = 0
+                
+                if obra_id_param and obra_id_param in opcoes.values():
+                    nome_atual = [k for k, v in opcoes.items() if v == obra_id_param][0]
+                    idx_selecionado = list(opcoes.keys()).index(nome_atual)
+                
+                selected_nome = st.selectbox("Obra:", list(opcoes.keys()), index=idx_selecionado)
+                
+                obra_id = opcoes[selected_nome]
+                
+            except Exception as e:
+                pass
     else:
         c_date = st.container()
 
