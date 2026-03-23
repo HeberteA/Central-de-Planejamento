@@ -32,7 +32,9 @@ def load_data(supabase, obra_id, start_date, end_date):
     def apply_query(table, date_col):
         try:
             q = supabase.table(table).select("*")
-            if obra_id: q = q.eq("obra_id", obra_id)
+            # CORREÇÃO AQUI: Só aplica o filtro se tiver obra_id E se for diferente de "todos"
+            if obra_id and obra_id != "todos": 
+                q = q.eq("obra_id", obra_id)
             if date_col:
                 q = q.gte(date_col, start_date).lte(date_col, end_date)
                 q = q.order(date_col)
@@ -159,6 +161,7 @@ def app(obra_id_param):
             try:
                 query_indicadores = supabase.table("pcp_historico_indicadores").select("*")
                 
+                # CORREÇÃO: Aplica filtro só se não for "todos"
                 if obra_id and obra_id != "todos":
                     query_indicadores = query_indicadores.eq("obra_id", obra_id)
                 
