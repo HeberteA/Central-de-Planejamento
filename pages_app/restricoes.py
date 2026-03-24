@@ -353,7 +353,16 @@ def app(obra_id):
                         st.rerun()
         
         if not df_all.empty:
-            render_boards(df_all, supabase)
+            df_filtrado = df_all.copy()
+            if busca_restricao:
+                mask = (
+                    df_filtrado['descricao'].str.contains(busca_restricao, case=False, na=False) |
+                    df_filtrado['responsavel'].str.contains(busca_restricao, case=False, na=False) |
+                    df_filtrado['area'].str.contains(busca_restricao, case=False, na=False)
+                )
+                df_filtrado = df_filtrado[mask]
+            
+            render_boards(df_filtrado, supabase) [cite: 10]
         else:
             st.info("Nenhuma restrição lançada.")
 
