@@ -351,9 +351,20 @@ def app(obra_id):
                         st.rerun()
         
         if not df_all.empty:
-            render_boards(df_all, supabase)
-        else:
-            st.info("Nenhuma restrição lançada.")
+        busca_restricao = st.text_input("Pesquisar restrição", placeholder="Digite a descrição, responsável ou área...")
+        
+        df_filtrado = df_all.copy()
+        if busca_restricao:
+            mask = (
+                df_filtrado['descricao'].str.contains(busca_restricao, case=False, na=False) |
+                df_filtrado['responsavel'].str.contains(busca_restricao, case=False, na=False) |
+                df_filtrado['area'].str.contains(busca_restricao, case=False, na=False)
+            )
+            df_filtrado = df_filtrado[mask]
+        
+        render_boards(df_filtrado, supabase)
+    else:
+        st.info("Nenhuma restrição lançada.")
 
     if is_admin and len(tabs) > 1:
         with tabs[1]:
