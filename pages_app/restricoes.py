@@ -301,7 +301,7 @@ def app(obra_id):
         st.markdown("")
         st.info(f"Periodo: {start_week.strftime('%d/%m/%Y')} a {end_week.strftime('%d/%m/%Y')}")
 
-    busca_atividade = st.text_input("Filtrar Atividade", placeholder="Ex: Alvenaria...")
+    busca_restricao = st.text_input("Filtrar Atividade", placeholder="Ex: Alvenaria...")
     
     total_mes_val = 0
     removidas_sem_val = 0
@@ -362,7 +362,7 @@ def app(obra_id):
                 )
                 df_filtrado = df_filtrado[mask]
             
-            render_boards(df_filtrado, supabase) [cite: 10]
+            render_boards(df_filtrado, supabase)
         else:
             st.info("Nenhuma restrição lançada.")
 
